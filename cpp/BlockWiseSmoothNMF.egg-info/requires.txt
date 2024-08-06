@@ -1,0 +1,8 @@
+hyperspy>=2.0.0
+exspy
+dask
+jupyterlab
+pybind11
+
+[dev]
+pytest>=6.0

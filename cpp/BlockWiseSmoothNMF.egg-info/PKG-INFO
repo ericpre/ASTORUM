@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: BlockWiseSmoothNMF
+Version: 0.1.0
+Summary: Block-wise implementaion of the SmoothNMF algorithm in C++.
+Author: Sebastian Cozma
+Author-email: sebastian.cozma@epfl.ch
+Requires-Python: >=3.11
+Requires-Dist: hyperspy>=2.0.0
+Requires-Dist: exspy
+Requires-Dist: dask
+Requires-Dist: jupyterlab
+Requires-Dist: pybind11
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
