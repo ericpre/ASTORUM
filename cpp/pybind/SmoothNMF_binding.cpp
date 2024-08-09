@@ -14,7 +14,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<std::vector<int>>);
 namespace py = pybind11;
 
 
-PYBIND11_MODULE(BlockWiseSmoothNMF, m) {
+PYBIND11_MODULE(BlockWiseSmoothNMFlib, m) {
     py::bind_vector<std::vector<int>>(m, "IntVector");
     py::bind_vector<std::vector<double>>(m, "DoubleVector");
     py::bind_vector<std::vector<std::string>>(m, "StringVector");
@@ -293,6 +293,7 @@ PYBIND11_MODULE(BlockWiseSmoothNMF, m) {
             int ,
             int ,
             int ,
+            int ,
             py::EigenDRef<Eigen::VectorXi>
             >())
 
@@ -312,24 +313,43 @@ PYBIND11_MODULE(BlockWiseSmoothNMF, m) {
         .def("spectralClustering", &BlockWiseSmoothNMF::spectralClustering, "Perform spectral clustering on the W blocks.", 
                 py::arg("clusteringSigma"), py::arg("metric"), py::arg("p"), py::arg("clusteringIter"), py::arg("clusteringTolerance"))
         .def("computeClusteredW", &BlockWiseSmoothNMF::computeClusteredW, "Compute the clustered W matrix.")
+        .def("VCA", &BlockWiseSmoothNMF::VCA, "Perform vertex component analysis (VCA) on the W blocks.", py::arg("verbose"), py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
+        .def("computeAbundanceVCA", &BlockWiseSmoothNMF::computeAbundanceVCA, "Compute the abundance matrix of the VCA endmembers.")
         .def("printClusterLabels", &BlockWiseSmoothNMF::printClusterLabels, "Print the cluster labels.", py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
-        .def("computeHBlocks", &BlockWiseSmoothNMF::computeHBlocks, "Compute the H blocks.", 
+        .def("getMonolithicX", &BlockWiseSmoothNMF::getMonolithicX, "Get the monolithic X matrix.")
+        .def("computeHBlocks", &BlockWiseSmoothNMF::computeHBlocks, "Compute the H blocks using SmoothNMF with fixed W.", 
+                py::arg("gammaStepArray"), py::arg("init"), py::arg("maxIter"), py::arg("randomSeed"), py::arg("algorithm"), 
+                py::arg("tol"), py::arg("logShift"), py::arg("eps"), py::arg("lambdaL"), py::arg("mu"), py::arg("epsilonReg"), 
+                py::arg("dichotomyTol"), py::arg("sigmaL"), py::arg("gammaStepScalar"), py::arg("simplexW"), py::arg("simplexH"), 
+                py::arg("l2"), py::arg("verbose"), py::arg("safe"), py::arg("debug"), py::arg("normalise"), py::arg("noStopCriterion"), 
+                py::arg("lineSearch"), py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
+        .def("computeHMatrix", &BlockWiseSmoothNMF::computeHMatrix, "Compute the monolithic H matrix using SmoothNMF with fixed W.", 
                 py::arg("gammaStepArray"), py::arg("init"), py::arg("maxIter"), py::arg("randomSeed"), py::arg("algorithm"), 
                 py::arg("tol"), py::arg("logShift"), py::arg("eps"), py::arg("lambdaL"), py::arg("mu"), py::arg("epsilonReg"), 
                 py::arg("dichotomyTol"), py::arg("sigmaL"), py::arg("gammaStepScalar"), py::arg("simplexW"), py::arg("simplexH"), 
                 py::arg("l2"), py::arg("verbose"), py::arg("safe"), py::arg("debug"), py::arg("normalise"), py::arg("noStopCriterion"), 
                 py::arg("lineSearch"), py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
         .def("computeHBlocksSVD", &BlockWiseSmoothNMF::computeHBlocksSVD, "Compute the H blocks using SVD.", py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
+        .def("computeHMatrixSVD", &BlockWiseSmoothNMF::computeHMatrixSVD, "Compute the monolithic H matrix using SVD.", py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
         .def("refineW", &BlockWiseSmoothNMF::refineW, "Refine the clustered W matrix.", 
                 py::arg("gammaStepArray"), py::arg("init"), py::arg("maxIter"), py::arg("randomSeed"), py::arg("algorithm"), 
                 py::arg("tol"), py::arg("logShift"), py::arg("eps"), py::arg("lambdaL"), py::arg("mu"), py::arg("epsilonReg"), 
                 py::arg("dichotomyTol"), py::arg("sigmaL"), py::arg("gammaStepScalar"), py::arg("simplexW"), py::arg("simplexH"), 
                 py::arg("l2"), py::arg("verbose"), py::arg("safe"), py::arg("debug"), py::arg("normalise"), py::arg("noStopCriterion"), 
                 py::arg("lineSearch"), py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
+        .def("refineWVCA", &BlockWiseSmoothNMF::refineWVCA, "Refine the W matrix obtained using VCA.", 
+                py::arg("gammaStepArray"), py::arg("init"), py::arg("maxIter"), py::arg("randomSeed"), py::arg("algorithm"), 
+                py::arg("tol"), py::arg("logShift"), py::arg("eps"), py::arg("lambdaL"), py::arg("mu"), py::arg("epsilonReg"), 
+                py::arg("dichotomyTol"), py::arg("sigmaL"), py::arg("gammaStepScalar"), py::arg("simplexW"), py::arg("simplexH"), 
+                py::arg("l2"), py::arg("verbose"), py::arg("safe"), py::arg("debug"), py::arg("normalise"), py::arg("noStopCriterion"), 
+                py::arg("lineSearch"), py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
         .def("computeABlocks", &BlockWiseSmoothNMF::computeABlocks, "Compute the absorption correction matrix blocks.", py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
+        .def("computeAMatrix", &BlockWiseSmoothNMF::computeAMatrix, "Compute the monolithic absorption correction matrix.", py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
         
         .def_readwrite("inputDir", &BlockWiseSmoothNMF::_inputDir)
         .def_readwrite("outputDir", &BlockWiseSmoothNMF::_outputDir)
+        .def_readwrite("blocksHorizontal", &BlockWiseSmoothNMF::_blocksHorizontal)
+        .def_readwrite("blocksVertical", &BlockWiseSmoothNMF::_blocksVertical)
         .def_readwrite("blocks", &BlockWiseSmoothNMF::_blocks)
         .def_readwrite("pixels", &BlockWiseSmoothNMF::_pixels)
         .def_readwrite("blockWidth", &BlockWiseSmoothNMF::_blockWidth)

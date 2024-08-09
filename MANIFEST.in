@@ -1,0 +1,9 @@
+global-include *.md
+global-include *.py
+global-include *.cpp
+global-include *.h
+global-include *.hpp
+global-include *.so
+global-include *.dll
+recursive-include databases *.json
+recursive-include databases *.txt

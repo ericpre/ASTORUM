@@ -1,6 +1,0 @@
-BlockWiseSmoothNMF.egg-info/PKG-INFO
-BlockWiseSmoothNMF.egg-info/SOURCES.txt
-BlockWiseSmoothNMF.egg-info/dependency_links.txt
-BlockWiseSmoothNMF.egg-info/not-zip-safe
-BlockWiseSmoothNMF.egg-info/requires.txt
-BlockWiseSmoothNMF.egg-info/top_level.txt

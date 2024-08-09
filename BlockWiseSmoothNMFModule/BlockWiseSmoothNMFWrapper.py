@@ -1,16 +1,5 @@
-import os
-import psutil
-import hyperspy.api as hs
-import dask.array as da
-import exspy
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import List, Tuple, Optional
-
-import sys
-sys.path.append("../cpp/out")
-import BlockWiseSmoothNMF
-
+from BlockWiseSmoothNMFModule.config import *
+import BlockWiseSmoothNMFlib
 
 # Utility functions
 
@@ -158,13 +147,13 @@ class SmoothNMF:
         energyAxisSize : Optional[np.float64] = None,
         energyAxisScale : Optional[np.float64] = None,
         energyAxisOffset : Optional[np.float64] = None,
-        detectorEfficiency : str = "interpolated_SDD_efficiency.txt",
-        xrayDB : str = "200keV_xrays_transformed.json",
-        massAbsorptionCoefficientsFilePath : str = "interpolated_mass_absorption_coefficients.json",
+        detectorEfficiency : str = str(DETECTOR_EFFICIENCY),
+        xrayDB : str = str(XRAY_200KeV),
+        massAbsorptionCoefficientsFilePath : str = str(MASS_ABSORPTION_COEFFICIENTS),
         decompositionResultsFilePath : Optional[str] = "",
         absorptionMatrixFilePath : Optional[str] = "",
         thicknessMapFilePath : Optional[str] = "",
-        periodicTableInfoFilePath : str = "periodic_table_symbols.json",
+        periodicTableInfoFilePath : str = str(PERIODIC_TABLE_INFO),
         elements : Optional[List[str]] = None,
         splitLinesElements : Optional[List[str]] = None,
         energyThresholds : Optional[List[np.float64]] = None,
@@ -518,13 +507,13 @@ class BlockWiseSmoothNMF:
         energyAxisSize : Optional[np.float64] = None,
         energyAxisScale : Optional[np.float64] = None,
         energyAxisOffset : Optional[np.float64] = None,
-        detectorEfficiency : str = "interpolated_SDD_efficiency.txt",
-        xrayDB : str = "200keV_xrays_transformed.json",
-        massAbsorptionCoefficientsFilePath : str = "interpolated_mass_absorption_coefficients.json",
+        detectorEfficiency : str = str(DETECTOR_EFFICIENCY),
+        xrayDB : str = str(XRAY_200KeV),
+        massAbsorptionCoefficientsFilePath : str = str(MASS_ABSORPTION_COEFFICIENTS),
         decompositionResultsFilePath : Optional[str] = "",
         absorptionMatrixFilePath : Optional[str] = "",
         thicknessMapFilePath : Optional[str] = "",
-        periodicTableInfoFilePath : str = "periodic_table_symbols.json",
+        periodicTableInfoFilePath : str = str(PERIODIC_TABLE_INFO),
         elements : Optional[List[str]] = None,
         splitLinesElements : Optional[List[str]] = None,
         energyThresholds : Optional[List[np.float64]] = None,
@@ -641,7 +630,7 @@ class BlockWiseSmoothNMF:
         thicknessMapFilePath = str(thicknessMapFilePath)
         periodicTableInfoFilePath = str(periodicTableInfoFilePath)
         
-        bwsnmf = BlockWiseSmoothNMFlib.BlockWiseSmoothNMF(inputDir, outputDir, blocks, blockWidth, blockHeight, nClusters, componentsVector)
+        bwsnmf = BlockWiseSmoothNMFlib.BlockWiseSmoothNMF(inputDir, outputDir, blockStructure[0], blockStructure[1], blockWidth, blockHeight, nClusters, componentsVector)
         
         bwsnmf.initialiseModel(beamEnergy, problemType, absorptionModelType, 
                     azimuthAngle, elevationAngle, tiltStage, thickness, density, widthSlope, widthIntercept, 
@@ -658,7 +647,9 @@ class BlockWiseSmoothNMF:
         
     def fitTransform(
         self,
-        HBlocksComputeAlgorithm : str = "SVD",
+        spectralClassificationMethod : str = "REFINED_VCA",
+        spatialComputationApproach : str = "BLOCKWISE",
+        spatialComputationAlgorithm : str = "SVD",
         gammaStepArray : Optional[np.ndarray] = None,
         init : Optional[str] = "NNDSVD",
         maxIter : Optional[int] = 100,
@@ -805,110 +796,50 @@ class BlockWiseSmoothNMF:
                             simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch, separationOrder,
                             precomputedW, writeWBlocks)
         
-        self.estimator.spectralClustering(clusteringSigma, metric, p, clusteringIter, clusteringTolerance)
-        self.estimator.computeClusteredW()
+        if (spectralClassificationMethod == "SPECTRAL_CLUSTERING" or spectralClassificationMethod == "REFINED_SPECTRAL_CLUSTERING"):
+            self.estimator.spectralClustering(clusteringSigma, metric, p, clusteringIter, clusteringTolerance)
+            self.estimator.computeClusteredW()
+            
+            if (spectralClassificationMethod == "REFINED_SPECTRAL_CLUSTERING"):
+                self.estimator.refineW(gammaStepArray,
+                                    init, maxIter, randomSeed, algorithm, 
+                                    tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar, 
+                                    simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
+            
+        elif (spectralClassificationMethod == "VCA" or spectralClassificationMethod == "REFINED_VCA"):
+            self.estimator.VCA(verbose)
+            
+            if (spectralClassificationMethod == "REFINED_VCA"):
+                self.estimator.refineWVCA(gammaStepArray,
+                                    init, maxIter, randomSeed, algorithm, 
+                                    tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar, 
+                                    simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
         
-        if (HBlocksComputeAlgorithm == "SVD"):
-            self.estimator.computeHBlocksSVD()
+        
+        if (spatialComputationApproach == "BLOCKWISE"):
+            if (spatialComputationAlgorithm == "SVD"):
+                self.estimator.computeHBlocksSVD()
+                    
+            elif (spatialComputationAlgorithm == "SMOOTHNMF"):
+                self.estimator.computeHBlocks(gammaStepArray,
+                                    init, maxIter, randomSeed, algorithm,
+                                    tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar,
+                                    simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
                 
-        elif (HBlocksComputeAlgorithm == "SmoothNMF"):
-            self.estimator.computeHBlocks(gammaStepArray,
-                                init, maxIter, randomSeed, algorithm,
-                                tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar,
-                                simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
+        elif (spatialComputationApproach == "MONOLITHIC"):
+            if (spatialComputationAlgorithm == "SVD"):
+                self.estimator.computeHMatrixSVD()
+                    
+            elif (spatialComputationAlgorithm == "SMOOTHNMF"):
+                self.estimator.computeHMatrix(gammaStepArray,
+                                    init, maxIter, randomSeed, algorithm,
+                                    tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar,
+                                    simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
                 
         writeArrayToFile(self.estimator.outputDir + "/G.onmf", self.estimator.G)
-    
-    def refineW(
-        self,
-        gammaStepArray : Optional[np.ndarray] = None,
-        init : Optional[str] = "NNDSVD",
-        maxIter : Optional[int] = 100,
-        randomSeed : Optional[int] = 0,
-        algorithm : Optional[str] = "LOG_SURROGATE",
-        tol : Optional[np.float64] = 1E-6,
-        logShift : Optional[np.float64] = 1E-14,
-        eps : Optional[np.float64] = 1E-6,
-        lambdaL : Optional[np.float64] = 0.0,
-        mu : Optional[np.float64] = 0.0,
-        epsilonReg : Optional[np.float64] = 1.0,
-        dichotomyTol : Optional[np.float64] = 1E-5,
-        sigmaL : Optional[np.float64] = 8.0,
-        gammaStepScalar : Optional[np.float64] = 0.0,
-        simplexW : Optional[bool] = True,
-        simplexH : Optional[bool] = False,
-        l2 : Optional[bool] = False,
-        verbose : Optional[bool] = False,
-        safe : Optional[bool] = False,
-        debug : Optional[bool] = False,
-        normalise : Optional[bool] = False,
-        noStopCriterion : Optional[bool] = False,
-        lineSearch : Optional[bool] = False
-    ) -> None:
         
-        if (gammaStepArray is None):
-            gammaStepArray = np.ascontiguousarray(np.array([0.0, 0.0], dtype = np.float64))
-            
-        match init:
-            case "RANDOM":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.RANDOM
-            
-            case "NNDSVD":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVD
-                
-            case "NNDSVDA":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVDA
-                
-            case "NNDSVDAR":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVDAR
-                
-            case _:
-                raise ValueError("Invalid initialisation method.")
-            
-        maxIter = int(maxIter)
-        randomSeed = int(randomSeed)
-        
-        match algorithm:
-            case "LOG_SURROGATE":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.LOG_SURROGATE
-                
-            case "L2_SURROGATE":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.L2_SURROGATE
-                
-            case "PROJECTED_GRADIENT":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.PROJECTED_GRADIENT
-                
-            case "BMD":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.BMD
-                
-            case _:
-                raise ValueError("Invalid algorithm.")
-                
-        tol = np.float64(tol)
-        logShift = np.float64(logShift)
-        eps = np.float64(eps)
-        lambdaL = np.float64(lambdaL)
-        mu = np.float64(mu)
-        epsilonReg = np.float64(epsilonReg)
-        dichotomyTol = np.float64(dichotomyTol)
-        sigmaL = np.float64(sigmaL)
-        gammaStepScalar = np.float64(gammaStepScalar)
-        
-        simplexW = bool(simplexW)
-        simplexH = bool(simplexH)
-        l2 = bool(l2)
-        verbose = bool(verbose)
-        safe = bool(safe)
-        debug = bool(debug)
-        normalise = bool(normalise)
-        noStopCriterion = bool(noStopCriterion)
-        lineSearch = bool(lineSearch)
-        
-        self.estimator.refineW(gammaStepArray,
-                            init, maxIter, randomSeed, algorithm, 
-                            tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar, 
-                            simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
-        
+        self.spatialComputationApproach = spatialComputationApproach
+          
         
     def readHBlocks(self) -> np.ndarray:
         H = np.zeros((int(self.estimator.nClusters), int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
@@ -950,8 +881,16 @@ class BlockWiseSmoothNMF:
     def getDecompositionResults(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         G = readArrayFromFile(self.estimator.outputDir + "/G.onmf")
         W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
-        H = self.readHBlocks()
-        Q = self.readQBlocks()
+        
+        if (self.spatialComputationApproach == "BLOCKWISE"):
+            H = self.readHBlocks()
+            Q = self.readQBlocks()
+        
+        elif (self.spatialComputationApproach == "MONOLITHIC"):
+            H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
+            H = H.reshape((H.shape[0], self.dataset.data.shape[0], self.dataset.data.shape[1]))
+            Q = readArrayFromFile(self.estimator.outputDir + "/Q/Q_monolithic.onmf")
+            Q = Q.reshape((Q.shape[0], self.dataset.data.shape[0], self.dataset.data.shape[1]))
         
         spectra = hs.signals.Signal1D(np.matmul(G, W).T)
         loadings = hs.signals.Signal2D(H)
@@ -975,11 +914,21 @@ class BlockWiseSmoothNMF:
                 D[i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)] = DBlock
 
         return D
+    
+    
+    def computeDensityMap(self) -> np.ndarray:
+        D = np.zeros((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
+        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
+        W = np.nan_to_num(W, nan = 1E-14)
+        H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
+        H = np.nan_to_num(H, nan = 1E-14)
+        D = self.estimator.model.computeDensityMap(W, H).reshape((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
+        
+        return D
 
 
     def computeThicknessMaps(self, LL : exspy.signals.LazyEELSSpectrum, D : np.ndarray, ZLP_threshold : np.float64, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
         LL.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), LL.data.shape[2]))
-        X = LL.data.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), LL.data.shape[2]))
         
         energyAxis = np.ascontiguousarray(LL.axes_manager.signal_axes[0].axis, dtype = np.float64)
         energyAxisScale = np.float64(LL.axes_manager.signal_axes[0].scale)
@@ -1008,6 +957,30 @@ class BlockWiseSmoothNMF:
                 writeArrayToFile(TFilename, EELS.T)
     
     
+    def computeThicknessMap(self, LL : exspy.signals.EELSSpectrum, D : np.ndarray, ZLP_threshold : np.float64, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:       
+        energyAxis = np.ascontiguousarray(LL.axes_manager.signal_axes[0].axis, dtype = np.float64)
+        energyAxisScale = np.float64(LL.axes_manager.signal_axes[0].scale)
+        energyAxisOffset = np.float64(LL.axes_manager.signal_axes[0].offset)
+        beamEnergy = np.float64(LL.metadata.Acquisition_instrument.TEM.beam_energy)
+        alpha = np.float64(LL.metadata.Acquisition_instrument.TEM.convergence_angle)
+        beta = np.float64(LL.metadata.Acquisition_instrument.TEM.Detector.EELS.collection_angle)
+        ZLP_threshold = np.float64(ZLP_threshold)
+        
+        if (useOpenMP):
+            if (numThreads is None):
+                numThreads = str(os.cpu_count())
+            
+            os.environ['OMP_NUM_THREADS'] = numThreads
+            
+        LLMatrix = LL.data.reshape((LL.data.shape[0] * LL.data.shape[1], LL.data.shape[2]))
+        LLMatrix = LLMatrix.T
+        D = D.reshape((D.shape[0] * D.shape[1]))
+        EELS = BlockWiseSmoothNMFlib.EELSDataset(LLMatrix, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, D, alpha, beta, ZLP_threshold)
+        EELS.computeThicknessMap()
+        TFilename = self.estimator.inputDir + "/T/T_monolithic.inmf"
+        writeArrayToFile(TFilename, EELS.T)
+        
+        
     def readTBlocks(self) -> np.ndarray:
         T = np.zeros((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
         
@@ -1043,6 +1016,27 @@ class BlockWiseSmoothNMF:
                 writeArrayToFile(AFilename, A)
     
     
+    def computeAbsorptionCorrectionMatrix(self, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
+        if (useOpenMP):
+            if (numThreads is None):
+                numThreads = str(os.cpu_count())
+            
+            os.environ['OMP_NUM_THREADS'] = numThreads
+        
+        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
+        W = np.nan_to_num(W, nan = 1E-14)
+        
+        TFilename = self.estimator.inputDir + "/T/T_monolithic.inmf"
+        self.estimator.model.thicknessMapFilePath = TFilename
+        
+        H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
+        H = np.nan_to_num(H, nan = 1E-14)
+        
+        A = self.estimator.model.generateAbsorptionCorrectionMatrix(W, H)
+        AFilename = self.estimator.outputDir + "/A/A_monolithic.onmf"
+        writeArrayToFile(AFilename, A)
+    
+    
     def readABlocks(self) -> np.ndarray:
         A = da.zeros((self.estimator.model.energyAxisSize, int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
         
@@ -1068,8 +1062,6 @@ class BlockWiseSmoothNMF:
         W = readArrayFromFile(W_path)
         GW = np.matmul(G, W[:, :nSelectedComponents])
         
-        # GW = GW / np.linalg.norm(GW)
-
         nChannels = G.shape[0]
         
         R = da.zeros((nChannels, int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
@@ -1078,10 +1070,7 @@ class BlockWiseSmoothNMF:
             for j in range(int(self.blockStructure[1])):
                 X_block = readArrayFromFile(X_block_path + str(i * int(self.blockStructure[1]) + j) + ".inmf")
                 H_block = readArrayFromFile(H_block_path + str(i * int(self.blockStructure[1]) + j) + ".onmf")
-                
-                # X_block = X_block / np.linalg.norm(X_block)
-                # H_block = H_block / np.linalg.norm(H_block)
-                
+                               
                 X_R = np.matmul(GW, H_block[:nSelectedComponents, :])
                 X_R = X_R / np.linalg.norm(X_R)
                 X_block = X_block / np.linalg.norm(X_block)
@@ -1097,23 +1086,51 @@ class BlockWiseSmoothNMF:
         RSignal.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), RSignal.data.shape[2]))
                 
         return RSignal
+    
+    
+    def calculateResidual(self, nSelectedComponents : int) -> exspy.signals.EDSTEMSpectrum:
+        X = self.estimator.getMonoliticX()
+        G = readArrayFromFile(self.estimator.outputDir + "/G.onmf")
+        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
+        H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
+        
+        GW = np.matmul(G, W[:, :nSelectedComponents])       
+        R = np.zeros((X.shape[0], X.shape[1]))
+        
+        X_R = np.matmul(GW, H[:nSelectedComponents, :])
+        X_R = X_R / np.linalg.norm(X_R)
+        X = X / np.linalg.norm(X)
+        
+        R = X - X_R
+        R[R <= 0.0] = 1e-14
+        R = R.reshape((X.shape[0], int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
+        RSignal = exspy.signals.EDSTEMSpectrum(R.transpose(1, 2, 0))
+        
+        return RSignal
         
         
-    def getMonolithicX(self) -> exspy.signals.LazyEDSTEMSpectrum:       
-        X = da.zeros((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStructure[1])))
-        
-        for i in range(int(self.blockStructure[0])):
-            for j in range(int(self.blockStructure[1])):
-                XBlock = readArrayFromFile(self.estimator.inputDir + "/X/X_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf")
-                XBlock = XBlock.reshape((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight), int(self.estimator.blockWidth)))
-                X[:, i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)] = XBlock
-                
-        X = X.transpose(1, 2, 0)
-        XSignal = exspy.signals.LazyEDSTEMSpectrum(X, lazy = True)
-        
-        X = X.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), X.shape[2]))
-        XSignal.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), XSignal.data.shape[2]))
-                
+    def getMonolithicXSignal(self) -> exspy.signals.EDSTEMSpectrum:
+        if (self.spatialComputationApproach == "BLOCKWISE"):       
+            X = da.zeros((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStructure[1])))
+            
+            for i in range(int(self.blockStructure[0])):
+                for j in range(int(self.blockStructure[1])):
+                    XBlock = readArrayFromFile(self.estimator.inputDir + "/X/X_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf")
+                    XBlock = XBlock.reshape((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight), int(self.estimator.blockWidth)))
+                    X[:, i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)] = XBlock
+                    
+            X = X.transpose(1, 2, 0)
+            XSignal = exspy.signals.LazyEDSTEMSpectrum(X, lazy = True)
+            
+            X = X.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), X.shape[2]))
+            XSignal.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), XSignal.data.shape[2]))
+            
+        elif (self.spatialComputationApproach == "MONOLITHIC"):
+            X = self.estimator.getMonoliticX()
+            X = X.reshape((X.shape[0], int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStructure[1])))
+            X = X.transpose(1, 2, 0)
+            XSignal = exspy.signals.EDSTEMSpectrum(X)
+                 
         return XSignal
     
     
@@ -1128,21 +1145,32 @@ class BlockWiseSmoothNMF:
                 XBlock = XBlock / ABlock
                 XNewFilename = self.estimator.inputDir + "/X_corrected/X_corrected_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf"
                 writeArrayToFile(XNewFilename, XBlock)
+                              
                 
-                
-    def getMonolithicAbsorptionCorrectedX(self) -> exspy.signals.LazyEDSTEMSpectrum:       
-        X = da.zeros((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
-        
-        for i in range(int(self.blockStructure[0])):
-            for j in range(int(self.blockStructure[1])):
-                XBlock = readArrayFromFile(self.estimator.inputDir + "/X_corrected/X_corrected_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf")
-                XBlock = XBlock.reshape((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight), int(self.estimator.blockWidth)))
-                X[:, i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)] = XBlock
-                
-        X = X.transpose(1, 2, 0)
-        XSignal = exspy.signals.LazyEDSTEMSpectrum(X, lazy = True)
-        
-        X = X.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), X.shape[2]))
-        XSignal.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), XSignal.data.shape[2]))
+    def getMonolithicAbsorptionCorrectedXSignal(self) -> exspy.signals.EDSTEMSpectrum:
+        if (self.spatialComputationApproach == "BLOCKWISE"):
+            self.writeAbsorptionCorrectedXBlocks()
+            
+            X = da.zeros((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
+            
+            for i in range(int(self.blockStructure[0])):
+                for j in range(int(self.blockStructure[1])):
+                    XBlock = readArrayFromFile(self.estimator.inputDir + "/X_corrected/X_corrected_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf")
+                    XBlock = XBlock.reshape((int(self.estimator.model.energyAxisSize), int(self.estimator.blockHeight), int(self.estimator.blockWidth)))
+                    X[:, i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)] = XBlock
+                    
+            X = X.transpose(1, 2, 0)
+            XSignal = exspy.signals.LazyEDSTEMSpectrum(X, lazy = True)
+            
+            X = X.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), X.shape[2]))
+            XSignal.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth), XSignal.data.shape[2]))
+            
+        elif (self.spatialComputationApproach == "MONOLITHIC"):
+            X = self.estimator.getMonoliticX()
+            A = readArrayFromFile(self.estimator.outputDir + "/A/A_monolithic.onmf")
+            X = X / A
+            X = X.reshape((X.shape[0], int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStructure[1])))
+            X = X.transpose(1, 2, 0)
+            XSignal = exspy.signals.EDSTEMSpectrum(X)
                 
         return XSignal

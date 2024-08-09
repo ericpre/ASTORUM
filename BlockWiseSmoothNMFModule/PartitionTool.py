@@ -1,16 +1,10 @@
-import hyperspy.api as hs
-import exspy
-import numpy as np
-import matplotlib.pyplot as plt
+from BlockWiseSmoothNMFModule.config import *
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.widgets import Button
-import dask.array as da
 from dask.distributed import Client, LocalCluster, get_client
 from scipy.linalg import svd
-import os
 import psutil
 import warnings
-from typing import List, Tuple, Optional
 
 def ordinal(value : int) -> str:
     """

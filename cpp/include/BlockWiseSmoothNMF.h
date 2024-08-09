@@ -11,6 +11,7 @@
 #include <random>
 #include <map>
 #include <iterator>
+#include <unordered_set>
 #include <Eigen/Dense>
 #include "SmoothNMF.h"
 
@@ -30,12 +31,16 @@ double hammingDistance(const Eigen::Ref<const Eigen::VectorXd>& a, const Eigen::
 
 double jaccardDistance(const Eigen::Ref<const Eigen::VectorXd>& a, const Eigen::Ref<const Eigen::VectorXd>& b);
 
+Eigen::VectorXd NNLS(const Eigen::Ref<const Eigen::MatrixXd>& M, const Eigen::Ref<const Eigen::VectorXd>& y);
+
 
 class BlockWiseSmoothNMF {
     public:
         std::string _inputDir;
         std::string _outputDir;
 
+        int _blocksHorizontal;
+        int _blocksVertical;
         int _blocks;
         int _pixels;
         int _blockWidth;
@@ -66,7 +71,8 @@ class BlockWiseSmoothNMF {
         BlockWiseSmoothNMF(
             const std::string& inputDir,
             const std::string& outputDir,
-            int blocks,
+            int blocksHorizontal,
+            int blocksVertical,
             int blockWidth,
             int blockHeight,
             int nClusters,
@@ -141,39 +147,19 @@ class BlockWiseSmoothNMF {
 
         void spectralClustering(double sigma, BlockWiseSmoothNMFConstants::distanceMetric metric, int p, int nIter, double tolerance);
 
+        double estimateSNR(const Eigen::Ref<const Eigen::MatrixXd>& R, const Eigen::Ref<const Eigen::VectorXd>& r_m, const Eigen::Ref<Eigen::MatrixXd>& x);
+
+        void VCA(bool verbose);
+
+        Eigen::MatrixXd computeAbundanceVCA();
+
         void printClusterLabels();
 
         void computeClusteredW();
 
         void computeComponentPresences();
 
-        void computeHBlocks( 
-            const Eigen::Ref<const Eigen::VectorXd>& gammaStepArray,
-            SmoothNMFConstants::initialisation init, 
-            int maxIter, 
-            int randomSeed, 
-            SmoothNMFConstants::algorithm algorithm,
-            double tol, 
-            double logShift, 
-            double eps, 
-            double lambdaL, 
-            double mu, 
-            double epsilonReg, 
-            double dichotomyTol, 
-            double sigmaL, 
-            double gammaStepScalar,
-            bool simplexW, 
-            bool simplexH, 
-            bool l2, 
-            bool verbose, 
-            bool safe,
-            bool debug, 
-            bool normalise, 
-            bool noStopCriterion, 
-            bool lineSearch
-        );
-
-        void computeHBlocksSVD();
+        void computeComponentPresencesVCA();
 
         void refineW(  
             const Eigen::Ref<const Eigen::VectorXd>& gammaStepArray,
@@ -201,7 +187,93 @@ class BlockWiseSmoothNMF {
             bool lineSearch
             );
 
+        void refineWVCA(  
+            const Eigen::Ref<const Eigen::VectorXd>& gammaStepArray,
+            SmoothNMFConstants::initialisation init, 
+            int maxIter, 
+            int randomSeed, 
+            SmoothNMFConstants::algorithm algorithm,
+            double tol, 
+            double logShift, 
+            double eps, 
+            double lambdaL, 
+            double mu, 
+            double epsilonReg, 
+            double dichotomyTol, 
+            double sigmaL, 
+            double gammaStepScalar,
+            bool simplexW, 
+            bool simplexH, 
+            bool l2, 
+            bool verbose, 
+            bool safe,
+            bool debug, 
+            bool normalise, 
+            bool noStopCriterion, 
+            bool lineSearch
+            );
+
+        Eigen::MatrixXd getMonolithicX();
+
+        void computeHBlocks( 
+            const Eigen::Ref<const Eigen::VectorXd>& gammaStepArray,
+            SmoothNMFConstants::initialisation init, 
+            int maxIter, 
+            int randomSeed, 
+            SmoothNMFConstants::algorithm algorithm,
+            double tol, 
+            double logShift, 
+            double eps, 
+            double lambdaL, 
+            double mu, 
+            double epsilonReg, 
+            double dichotomyTol, 
+            double sigmaL, 
+            double gammaStepScalar,
+            bool simplexW, 
+            bool simplexH, 
+            bool l2, 
+            bool verbose, 
+            bool safe,
+            bool debug, 
+            bool normalise, 
+            bool noStopCriterion, 
+            bool lineSearch
+        );
+
+        void computeHMatrix( 
+            const Eigen::Ref<const Eigen::VectorXd>& gammaStepArray,
+            SmoothNMFConstants::initialisation init, 
+            int maxIter, 
+            int randomSeed, 
+            SmoothNMFConstants::algorithm algorithm,
+            double tol, 
+            double logShift, 
+            double eps, 
+            double lambdaL, 
+            double mu, 
+            double epsilonReg, 
+            double dichotomyTol, 
+            double sigmaL, 
+            double gammaStepScalar,
+            bool simplexW, 
+            bool simplexH, 
+            bool l2, 
+            bool verbose, 
+            bool safe,
+            bool debug, 
+            bool normalise, 
+            bool noStopCriterion, 
+            bool lineSearch
+        );
+
+        void computeHBlocksSVD();
+
+        void computeHMatrixSVD();
+
         void computeABlocks();
+
+        void computeAMatrix();
 };
 
 #endif

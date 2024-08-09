@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(BlockWiseSmoothNMF VERSION 0.1.0 LANGUAGES CXX)
+project(BlockWiseSmoothNMFlib VERSION 0.1.0 LANGUAGES CXX)
 
 ##### Set default behavior #####
 set(DEFAULT_USE_OMP Yes)
@@ -215,14 +215,14 @@ set(PY_BINDING_FILE
     ${CMAKE_SOURCE_DIR}/pybind/SmoothNMF_binding.cpp
 )
 
-pybind11_add_module(BlockWiseSmoothNMF
+pybind11_add_module(BlockWiseSmoothNMFlib
     ${SRC_FILES}
     ${INCLUDE_FILES}
     ${PY_BINDING_FILE}
 )
 
-target_link_libraries(BlockWiseSmoothNMF PUBLIC pybind11::embed)
+target_link_libraries(BlockWiseSmoothNMFlib PUBLIC pybind11::embed)
 
-install(TARGETS BlockWiseSmoothNMF
+install(TARGETS BlockWiseSmoothNMFlib
     COMPONENT python
     LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}/out")
