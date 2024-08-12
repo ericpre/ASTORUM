@@ -66,78 +66,6 @@ double jaccardDistance(const Eigen::Ref<const Eigen::VectorXd>& a, const Eigen::
     return 1.0 - (a.array().min(b.array())).sum() / (a.array().max(b.array())).sum();
 }
 
-Eigen::VectorXd NNLS(const Eigen::Ref<const Eigen::MatrixXd>& M, const Eigen::Ref<const Eigen::VectorXd>& y) {
-    int R = M.cols();
-    Eigen::VectorXd x = Eigen::VectorXd::Zero(R);
-    Eigen::VectorXd w = M.transpose() * (y - M * x);
-    std::vector<bool> passive_set(R, false);
-
-    while (true) {
-        int max_index = -1;
-        double max_value = 0;
-
-        for (int i = 0; i < R; i++) {
-            if (!passive_set[i] && w[i] > max_value) {
-                max_value = w[i];
-                max_index = i;
-            }
-        }
-
-        if (max_index == -1) {
-            break;
-        }
-
-        passive_set[max_index] = true;
-
-        Eigen::VectorXd x_trial = x;
-
-        while (true) {
-            Eigen::VectorXi active_indices(passive_set.size());
-            int active_count = 0;
-
-            for (int i = 0; i < passive_set.size(); i++) {
-                if (passive_set[i]) {
-                    active_indices[active_count++] = i;
-                }
-            }
-
-            active_indices.conservativeResize(active_count);
-
-            Eigen::MatrixXd Ma = M(Eigen::placeholders::all, active_indices);
-            Eigen::VectorXd xa = Ma.colPivHouseholderQr().solve(y);
-
-            bool any_negative = false;
-            double alpha = 1.0;
-
-            for (int i = 0; i < active_count; i++) {
-                if (xa[i] < 0) {
-                    any_negative = true;
-                    alpha = std::min(alpha, x_trial[active_indices[i]] / (x_trial[active_indices[i]] - xa[i]));
-                }
-            }
-
-            x_trial = x;
-            x_trial(active_indices) = (1 - alpha) * x_trial(active_indices) + alpha * xa;
-
-            if (!any_negative) {
-                break;
-            }
-
-            for (int i = 0; i < active_count; i++) {
-                if (x_trial[active_indices[i]] == 0) {
-                    passive_set[active_indices[i]] = false;
-                }
-            }
-        }
-
-        x = x_trial;
-        w = M.transpose() * (y - M * x);
-    }
-
-    return x;
-}
-
-
 BlockWiseSmoothNMF::BlockWiseSmoothNMF() {
     _blocks = 0;
     _Gcols = 0;
@@ -360,7 +288,7 @@ Eigen::MatrixXd BlockWiseSmoothNMF::postProcessData(const Eigen::Ref<const Eigen
         }
     }
 
-    // To be implemented: Higher order separation
+    // To be implemented: Higher order separation (if needed)
 
     for (int i = 0; i < WMod.cols(); i++) {
         double colSum = WMod.col(i).sum();
@@ -619,7 +547,7 @@ void BlockWiseSmoothNMF::spectralClustering(double sigma, BlockWiseSmoothNMFCons
                     break;
 
                 case BlockWiseSmoothNMFConstants::distanceMetric::MAHALANOBIS:
-                    // Not yet implemented
+                    // Not yet implemented (perhaps not needed)
                     break;
                 
                 case BlockWiseSmoothNMFConstants::distanceMetric::MINKOWSKI:
@@ -818,7 +746,9 @@ Eigen::MatrixXd BlockWiseSmoothNMF::computeAbundanceVCA() {
 
     for (int i = 0; i < _nPoints; i++) {
         Eigen::VectorXd y = Y.col(i);
-        A.col(i) = NNLS(M, y);
+        Eigen::NNLS<Eigen::MatrixXd> nnls(M);
+        A.col(i) = nnls.solve(y);
+        A.col(i).array() = A.col(i).array().max(1E-10);
     }
 
     return A.transpose();
@@ -906,12 +836,35 @@ void BlockWiseSmoothNMF::computeComponentPresencesVCA() {
     _componentPresences = Eigen::MatrixXi::Zero(_blocks, _nClusters);
 
     for (int blockIndex = 0; blockIndex < _blocks; blockIndex++) {
-        int numComponents = _componentsVector[blockIndex]; 
+        int numComponents = _componentsVector[blockIndex];
+        std::unordered_set<int> usedEndmembers;
 
         for (int compIndex = 0; compIndex < numComponents; compIndex++) {
             int globalCompIndex = startIndex + compIndex;
             int endmemberIndex = dominantEndmembers[globalCompIndex];
 
+            if (usedEndmembers.find(endmemberIndex) != usedEndmembers.end()) {
+                std::cout<<"Warning : Duplicate endmember found in block "<<blockIndex + 1<<" at index "<<globalCompIndex + 1<<".\n";
+                Eigen::VectorXd::Index maxIndex;
+                Eigen::VectorXd sortedAbundance = A.row(globalCompIndex);
+                std::vector<std::pair<double, int>> sortedEndmembers;
+
+                for (int j = 0; j < sortedAbundance.size(); j++) {
+                    sortedEndmembers.emplace_back(sortedAbundance(j), j);
+                }
+                std::sort(sortedEndmembers.begin(), sortedEndmembers.end(),
+                          std::greater<std::pair<double, int>>());
+
+                for (const auto& pair : sortedEndmembers) {
+                    int potentialEndmemberIndex = pair.second;
+                    if (usedEndmembers.find(potentialEndmemberIndex) == usedEndmembers.end()) {
+                        endmemberIndex = potentialEndmemberIndex;
+                        break;
+                    }
+                }
+            }
+
+            usedEndmembers.insert(endmemberIndex);
             _componentPresences(blockIndex, endmemberIndex) = 1;
         }
 
@@ -1145,8 +1098,6 @@ void BlockWiseSmoothNMF::computeHBlocks(
     {
         std::cout<<"Computing H blocks using SmoothNMF (with fixed W)..."<<"\n\n";
 
-        // computeComponentPresences();
-
         for (int blockIndex = 0; blockIndex < _blocks; blockIndex++) {
             std::string XFilename = _inputDir + "/X/X_block_" + std::to_string(blockIndex) + ".inmf";
             Eigen::MatrixXd X = readMatrixFromFile(XFilename);
@@ -1155,17 +1106,6 @@ void BlockWiseSmoothNMF::computeHBlocks(
                 std::string AFilename = _outputDir + "/A/A_block_" + std::to_string(blockIndex) + ".onmf";
                 _model._absorptionMatrixFilePath = AFilename;
             }
-
-            // Eigen::MatrixXd H = Eigen::MatrixXd::Zero(_componentsVector(blockIndex), _pixels);
-            // Eigen::MatrixXd fixedH = Eigen::MatrixXd::Constant(_componentsVector(blockIndex), _pixels, -1.0);
-            // Eigen::MatrixXd WBlock = Eigen::MatrixXd::Zero(_WClustered.rows(), 0);
-
-            // for (int j = 0; j < _nClusters; j++) {
-            //     if (_componentPresences(blockIndex, j) == 1) {
-            //         WBlock.conservativeResize(Eigen::NoChange, WBlock.cols() + 1);
-            //         WBlock.col(WBlock.cols() - 1) = _WClustered.col(j);
-            //     }
-            // }
 
             Eigen::MatrixXd H = Eigen::MatrixXd::Zero(_nClusters, _pixels);
             Eigen::MatrixXd fixedH = Eigen::MatrixXd::Constant(_nClusters, _pixels, -1.0);
@@ -1183,13 +1123,6 @@ void BlockWiseSmoothNMF::computeHBlocks(
             
             int HIndex = 0;
             
-            // for (int j = 0; j < _nClusters; j++) {
-            //     if (_componentPresences(blockIndex, j) == 1) {
-            //         finalH.row(j) = snmf._H.row(HIndex);
-            //         HIndex++;
-            //     }
-            // }
-
             std::cout<<"Computed H block : "<<blockIndex + 1<<" / "<<_blocks<<".\n\n";
 
             std::string HFilename = _outputDir + "/H/H_block_" + std::to_string(blockIndex) + ".onmf";
@@ -1283,8 +1216,6 @@ void BlockWiseSmoothNMF::computeHMatrix(
 void BlockWiseSmoothNMF::computeHBlocksSVD() {
     std::cout<<"Computing H blocks using SVD..."<<"\n\n";
 
-    // computeComponentPresences();
-
     for (int blockIndex = 0; blockIndex < _blocks; blockIndex++) {
         std::string XFilename = _inputDir + "/X/X_block_" + std::to_string(blockIndex) + ".inmf";
         Eigen::MatrixXd X = readMatrixFromFile(XFilename);
@@ -1295,33 +1226,12 @@ void BlockWiseSmoothNMF::computeHBlocksSVD() {
             X.array() = X.array() / A.array();
         }
 
-        // Eigen::MatrixXd H = Eigen::MatrixXd::Zero(_componentsVector(blockIndex), _pixels);
-        // Eigen::MatrixXd WBlock = Eigen::MatrixXd::Zero(_WClustered.rows(), 0);
-
         Eigen::MatrixXd finalH = Eigen::MatrixXd::Zero(_nClusters, _pixels);
-
-        // for (int j = 0; j < _nClusters; j++) {
-        //     if (_componentPresences(blockIndex, j) == 1) {
-        //         WBlock.conservativeResize(Eigen::NoChange, WBlock.cols() + 1);
-        //         WBlock.col(WBlock.cols() - 1) = _WClustered.col(j);
-        //     }
-        // }
 
         Eigen::MatrixXd GW = _G * _WClustered;
         
         Eigen::BDCSVD<Eigen::MatrixXd, Eigen::HouseholderQRPreconditioner | Eigen::ComputeThinU | Eigen::ComputeThinV> SVD(GW);
         finalH = SVD.solve(X).cwiseAbs();
-
-        // Eigen::MatrixXd finalH = Eigen::MatrixXd::Zero(_nClusters, _pixels);
-        
-        // int HIndex = 0;
-        
-        // for (int j = 0; j < _nClusters; j++) {
-        //     if (_componentPresences(blockIndex, j) == 1) {
-        //         finalH.row(j) = H.row(HIndex);
-        //         HIndex++;
-        //     }
-        // }
 
         std::cout<<"Computed H block : "<<blockIndex + 1<<" / "<<_blocks<<".\n\n";
 
@@ -1347,8 +1257,6 @@ void BlockWiseSmoothNMF::computeHBlocksSVD() {
 
 void BlockWiseSmoothNMF::computeHMatrixSVD() {
     std::cout<<"Computing monolithic H matrix using SVD..."<<"\n\n";
-
-    // computeComponentPresences();
 
     Eigen::MatrixXd X = getMonolithicX();
 
