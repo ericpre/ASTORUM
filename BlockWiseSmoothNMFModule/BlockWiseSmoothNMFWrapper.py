@@ -489,8 +489,7 @@ class BlockWiseSmoothNMF:
     def __init__(
         self,
         dataset : exspy.signals.LazyEDSTEMSpectrum,
-        inputDir : str,
-        outputDir : str,
+        workingDirectory : str,
         blockShape : Tuple[int, int],
         nClusters : int,
         componentsVector : np.ndarray,
@@ -528,6 +527,11 @@ class BlockWiseSmoothNMF:
         X = dataset.data.rechunk((blockShape[0], blockShape[1], dataset.data.shape[2]))
         
         self.writeXBlocks(X, inputDir)
+        
+        inputDir = os.path.join(workingDirectory, "blockwise_input")
+        outputDir = os.path.join(workingDirectory, "blockwise_output")
+        os.makedirs(inputDir, exist_ok = True)
+        os.makedirs(outputDir, exist_ok = True)
         
         inputDir = str(inputDir)
         outputDir = str(outputDir)
@@ -1052,7 +1056,10 @@ class BlockWiseSmoothNMF:
         return ASignal
     
     
-    def calculateResiduals(self, nSelectedComponents : int) -> exspy.signals.LazyEDSTEMSpectrum:
+    def calculateResiduals(self, nSelectedComponents : Optional[int]) -> exspy.signals.LazyEDSTEMSpectrum:
+        if (nSelectedComponents is None):
+            nSelectedComponents = int(self.estimator.nClusters)
+            
         X_block_path = self.estimator.inputDir + "/X/X_block_"
         G_path = self.estimator.outputDir + "/G.onmf"
         W_path = self.estimator.outputDir + "/W/W_clustered.onmf"
@@ -1088,7 +1095,10 @@ class BlockWiseSmoothNMF:
         return RSignal
     
     
-    def calculateResidual(self, nSelectedComponents : int) -> exspy.signals.EDSTEMSpectrum:
+    def calculateResidual(self, nSelectedComponents : Optional[int]) -> exspy.signals.EDSTEMSpectrum:
+        if (nSelectedComponents is None):
+            nSelectedComponents = int(self.estimator.nClusters)
+            
         X = self.estimator.getMonoliticX()
         G = readArrayFromFile(self.estimator.outputDir + "/G.onmf")
         W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
