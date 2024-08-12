@@ -10,7 +10,7 @@ The package is structured as follows:
 Both decomposition algorithms are included in the *_BlockWiseSmoothNMFWrapper_* module and the partition tool is separated in *_PartitionTool_*.
 
 ## Installation
-To install the package simply run the following command in the root directory of the repository::
+To install the package simply run the following command in the root directory of the repository:
 
     $ pip install -e .
 
