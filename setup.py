@@ -61,11 +61,11 @@ class CMakeBuild(build_ext):
         os.makedirs(build_dir, exist_ok = True)
         
         subprocess.check_call(
-            ["cmake", os.getcwd()] + cmake_args, cwd = build_dir, env = env
+            ["cmake", os.getcwd()] + cmake_args, cwd = os.getcwd(), env = env
         )
         
         subprocess.check_call(
-            ["cmake", "--build", os.getcwd(), "--target", "install"] + build_args, cwd = build_dir
+            ["cmake", "--build", os.getcwd(), "--target", "install"] + build_args, cwd = os.getcwd()
         )
 
     def _generate_args(self, ext):
@@ -103,7 +103,7 @@ class CMakeBuild(build_ext):
                     ]
 
             n_cpus = os.cpu_count()
-            build_args += [f"-j{n_cpus}"]
+            build_args += ["--", f"-j{n_cpus}"]
 
         return build_args, cmake_args
 
