@@ -454,7 +454,7 @@ class SmoothNMF:
         BlockWiseSmoothNMFlib.printConcentrationReport(self.estimator.G, self.estimator.W, self.estimator.H, self.estimator.model.modelElements, self.estimator.model.quantificationElements, fitError)
         
 
-# Wrapper function for BlockWiseSmoothNMF
+# Wrapper class for BlockWiseSmoothNMF
 
 class BlockWiseSmoothNMF:
     def writeXBlocks(self, dataArray : np.ndarray, outputDirectory : str) -> None:
@@ -521,12 +521,8 @@ class BlockWiseSmoothNMF:
         absorptionElementsConcentrations : Optional[List[np.float64]] = None
     ) -> None:
 
-        self.createDirectories(inputDir, outputDir)
-        
         dataset.rechunk((blockShape[0], blockShape[1], dataset.data.shape[2]))
         X = dataset.data.rechunk((blockShape[0], blockShape[1], dataset.data.shape[2]))
-        
-        self.writeXBlocks(X, inputDir)
         
         inputDir = os.path.join(workingDirectory, "blockwise_input")
         outputDir = os.path.join(workingDirectory, "blockwise_output")
@@ -535,6 +531,9 @@ class BlockWiseSmoothNMF:
         
         inputDir = str(inputDir)
         outputDir = str(outputDir)
+        
+        self.createDirectories(inputDir, outputDir)
+        self.writeXBlocks(X, inputDir)
         
         blockStructure = (int(dataset.data.shape[0] / blockShape[0]), int(dataset.data.shape[1] / blockShape[1]))
         blocks = int((dataset.data.shape[0] / blockShape[0]) * (dataset.data.shape[1] / blockShape[1]))
@@ -948,13 +947,13 @@ class BlockWiseSmoothNMF:
             
             os.environ['OMP_NUM_THREADS'] = numThreads
         
-        for i in range(LL.blocks.shape[0]):
-            for j in range(LL.blocks.shape[1]):
-                LLBlock = LL.blocks[i, j, 0].compute()
+        for i in range(LL.data.blocks.shape[0]):
+            for j in range(LL.data.blocks.shape[1]):
+                LLBlock = LL.data.blocks[i, j, 0].compute()
                 LLBlock = LLBlock.reshape((LLBlock.shape[0] * LLBlock.shape[1], LLBlock.shape[2]))
                 LLBlock = LLBlock.T
                 DBlock = D[i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)]
-                DBlock.reshape((D.shape[0] * D.shape[1]))
+                DBlock = DBlock.reshape((DBlock.shape[0] * DBlock.shape[1]))
                 EELS = BlockWiseSmoothNMFlib.EELSDataset(LLBlock, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, DBlock, alpha, beta, ZLP_threshold)
                 EELS.computeThicknessMap()
                 TFilename = self.estimator.inputDir + "/T/T_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf"
@@ -1056,7 +1055,7 @@ class BlockWiseSmoothNMF:
         return ASignal
     
     
-    def calculateResiduals(self, nSelectedComponents : Optional[int]) -> exspy.signals.LazyEDSTEMSpectrum:
+    def calculateResiduals(self, nSelectedComponents : Optional[int] = None) -> exspy.signals.LazyEDSTEMSpectrum:
         if (nSelectedComponents is None):
             nSelectedComponents = int(self.estimator.nClusters)
             
@@ -1095,7 +1094,7 @@ class BlockWiseSmoothNMF:
         return RSignal
     
     
-    def calculateResidual(self, nSelectedComponents : Optional[int]) -> exspy.signals.EDSTEMSpectrum:
+    def calculateResidual(self, nSelectedComponents : Optional[int] = None) -> exspy.signals.EDSTEMSpectrum:
         if (nSelectedComponents is None):
             nSelectedComponents = int(self.estimator.nClusters)
             
@@ -1113,7 +1112,7 @@ class BlockWiseSmoothNMF:
         
         R = X - X_R
         R[R <= 0.0] = 1e-14
-        R = R.reshape((X.shape[0], int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
+        R = R.reshape((X.shape[0], int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStructure[1])))
         RSignal = exspy.signals.EDSTEMSpectrum(R.transpose(1, 2, 0))
         
         return RSignal
@@ -1184,3 +1183,17 @@ class BlockWiseSmoothNMF:
             XSignal = exspy.signals.EDSTEMSpectrum(X)
                 
         return XSignal
+    
+
+    def printConcentrationReport(self, fitError : Optional[bool] = True):
+        G = self.estimator.G
+        W = self.estimator.WClustered
+        
+        if (self.spatialComputationApproach == "BLOCKWISE"):
+            H = self.readHBlocks()
+            H = H.reshape((H.shape[0], H.shape[1] * H.shape[2]))
+        
+        elif (self.spatialComputationApproach == "MONOLITHIC"):
+            H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
+            
+        BlockWiseSmoothNMFlib.printConcentrationReport(G, W, H, self.estimator.model.modelElements, self.estimator.model.quantificationElements, fitError)
