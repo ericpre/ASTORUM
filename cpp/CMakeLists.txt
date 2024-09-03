@@ -147,6 +147,8 @@ elseif(MSVC)
 	#Compile csim with cpp compiler since VC does not completely support C99 complex values
 	SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 	add_compile_options("/TP")
+	add_compile_options("/std:c++17")
+	add_compile_options("/permissive")
 
 	# Ignore warning
 	## ignore warning about template export

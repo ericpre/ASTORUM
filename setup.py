@@ -77,7 +77,8 @@ class CMakeBuild(build_ext):
         if platform.system() == "Windows":
             if sys.maxsize > 2**32:
                 cmake_args += ["-A", "x64"]
-            build_args += ["--", "/m"]
+            n_cpus = os.cpu_count()
+            build_args += ["--parallel", f"{n_cpus}"]
             
         else:
             # In macOS, gcc/g++ is aliased to clang/clang++.
