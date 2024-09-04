@@ -121,7 +121,7 @@ if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" S
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 	# Enable imaginary literals for C++
-	if(NOT MINGW)
+	if(NOT MINGW AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fext-numeric-literals")
 	endif()
 
