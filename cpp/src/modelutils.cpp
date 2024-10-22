@@ -507,10 +507,10 @@ double computeSingleAbsorptionCorrection(double energy, const std::string& eleme
 
 Eigen::MatrixXd getExplainedIntensity(const Eigen::Ref<const Eigen::MatrixXd>& G, const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H) {
     Eigen::MatrixXd N = Eigen::MatrixXd::Zero(W.rows(), W.cols());
-
+    
     for (int i = 0; i < W.rows(); i++) {
         for (int j = 0; j < W.cols(); j++) {
-            N(i, j) = (G.col(i).replicate(1, H.cols()).array() * W(i, j) * H.row(j).replicate(G.rows(), 1).array()).sum();
+            N(i, j) = (G.col(i) * H.row(j)).sum() * W(i, j);
         }
     }
 

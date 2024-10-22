@@ -18,9 +18,13 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 
 	if("${CMAKE_HOST_SYSTEM_PROCESSOR}" MATCHES "^x86.*")
 		set(DEFAULT_OPT_FLAGS "-mtune=native -march=native -mfpmath=both")
+
+	elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" MATCHES "^arm.*")
+		set(DEFAULT_OPT_FLAGS "-mtune=native -mcpu=native")
 	
     else()
 		set(DEFAULT_OPT_FLAGS "-mtune=native -march=native")
+
     endif()
 
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -32,6 +36,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 
 elseif (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
 	set(DEFAULT_USE_OMP No)
+	message(WARNING, "OpenMP is not supported for clang. Do not set USE_OMP=Yes on this environment.")
 
 	if(${COVERAGE})
 		message(FATAL_ERROR "Coverage is not supported for clang. Do not set COVERAGE=Yes on this environment.")
@@ -223,7 +228,7 @@ pybind11_add_module(BlockWiseSmoothNMFlib
     ${PY_BINDING_FILE}
 )
 
-target_link_libraries(BlockWiseSmoothNMFlib PUBLIC pybind11::embed)
+target_link_libraries(BlockWiseSmoothNMFlib PUBLIC pybind11::module)
 
 install(TARGETS BlockWiseSmoothNMFlib
     COMPONENT python

@@ -32,6 +32,37 @@ class CMakeBuild(build_ext):
         
         for ext in self.extensions:
             self.build_extension(ext)
+            
+    def find_highest_gcc_version(self):
+        # Potential paths where g++ might be installed
+        possible_paths = [
+            "/opt/homebrew/bin",                # Apple Silicon (M1/M2)
+            "/usr/local/bin",                   # macOS Intel (default for Homebrew)
+            "/home/linuxbrew/.linuxbrew/bin",   # Linuxbrew on Linux
+            "/usr/bin",                         # Default for Linux (apt, yum, etc.)
+        ]
+        
+        gxx_versions = []
+        
+        # Search for all installed g++ versions in possible paths
+        for path in possible_paths:
+            if os.path.exists(path):
+                try:
+                    # List all g++ executables in the directory
+                    output = subprocess.check_output([f"ls {path}/g++-*"], shell=True, universal_newlines=True)
+                    # Find versions that match g++-<version>
+                    gxx_versions += re.findall(r"g\+\+-(\d+)", output)
+                except subprocess.CalledProcessError:
+                    # Path exists but no g++-* files found
+                    continue
+
+        if gxx_versions:
+            # Convert to integers and sort in descending order to find the highest version
+            gxx_versions = sorted(map(int, gxx_versions), reverse=True)
+            # Return the highest version of g++
+            return f"g++-{gxx_versions[0]}"
+        else:
+            return None
 
     def build_extension(self, ext):
         build_args, cmake_args = self._generate_args(ext)
@@ -61,11 +92,11 @@ class CMakeBuild(build_ext):
         os.makedirs(build_dir, exist_ok = True)
         
         subprocess.check_call(
-            ["cmake", os.getcwd()] + cmake_args, cwd = os.getcwd(), env = env
+            ["cmake", "-S", os.getcwd(), "-B", build_dir] + cmake_args, cwd = os.getcwd(), env = env
         )
         
         subprocess.check_call(
-            ["cmake", "--build", os.getcwd(), "--target", "install"] + build_args, cwd = os.getcwd()
+            ["cmake", "--build", build_dir, "--target", "install"] + build_args, cwd = os.getcwd()
         )
 
     def _generate_args(self, ext):
@@ -81,30 +112,25 @@ class CMakeBuild(build_ext):
             build_args += ["--parallel", f"{n_cpus}"]
             
         else:
-            # In macOS, gcc/g++ is aliased to clang/clang++.
             gxx = os.getenv("CXX_COMPILER", "g++")
             
-            if gxx is None:
-                raise RuntimeError(
-                    "gcc/g++ must be installed to build the following extensions: "
-                    + ", ".join(e.name for e in self.extensions)
-                )
-
-            cmake_args += ["-DCMAKE_CXX_COMPILER=" + gxx]
-            cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-
             if platform.system() == "Darwin":
-                # This is for building Python package on GitHub Actions, whose architecture is x86_64.
-                # Without specifying the architecture explicitly,
-                # binaries for arm64 is built for x86_64 while cibuildwheel intends to build for arm64.
                 archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
+                
                 if len(archs) > 0:
                     cmake_args += [
                         "-DCMAKE_OSX_ARCHITECTURES={}".format(";".join(archs))
                     ]
+                    
+                gxx = self.find_highest_gcc_version() or "g++"
+                
+            if gxx is None:
+                raise RuntimeError("No suitable g++ version found.")
 
             n_cpus = os.cpu_count()
             build_args += ["--", f"-j{n_cpus}"]
+            cmake_args += ["-DCMAKE_CXX_COMPILER=" + gxx]
+            cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
 
         return build_args, cmake_args
 
@@ -113,7 +139,7 @@ setup(
     version = "0.1.0",
     author = "Sebastian Cozma",
     author_email = "sebastian.cozma@epfl.ch",
-    description = "Block-wise implementaion of the SmoothNMF algorithm in C++.",
+    description = "Block-wise implementation of the SmoothNMF algorithm in C++.",
     license = "GPLv3",
     license_files = ("LICENSE"),
     long_description = "",
