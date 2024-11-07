@@ -1292,48 +1292,80 @@ void BlockWiseSmoothNMF::computeHMatrixSVD() {
     std::cout<<"Monolithic H matrix computed successfully."<<"\n\n";
 }
 
-void BlockWiseSmoothNMF::computeABlocks() {
+void BlockWiseSmoothNMF::computeABlocks(BlockWiseSmoothNMFConstants::fusionType fusionType) {
     std::cout<<"Computing A blocks..."<<"\n";
 
-    if (_WClustered.isZero()) {
-        std::string WClusteredFilename = _outputDir + "/W/W_clustered.onmf";
-        _WClustered = readMatrixFromFile(WClusteredFilename);
+    if (fusionType == BlockWiseSmoothNMFConstants::fusionType::EELS) {
+        if (_WClustered.isZero()) {
+            std::string WClusteredFilename = _outputDir + "/W/W_clustered.onmf";
+            _WClustered = readMatrixFromFile(WClusteredFilename);
+        }
+
+        for (int blockIndex = 0; blockIndex < _blocks; blockIndex++) {
+            std::string HFilename = _outputDir + "/H/H_block_" + std::to_string(blockIndex) + ".onmf";
+            std::string TFilename = _inputDir + "/T/T_block_" + std::to_string(blockIndex) + ".inmf";
+            _model._thicknessMapFilePath = TFilename;
+
+            Eigen::MatrixXd HBlock = readMatrixFromFile(HFilename);
+            Eigen::MatrixXd ABlock = _model.generateAbsorptionCorrectionMatrix(_WClustered, HBlock);
+            
+            std::cout<<"Computed A block : "<<blockIndex + 1<<" / "<<_blocks<<".\n\n";
+
+            std::string AFilename = _outputDir + "/A/A_block_" + std::to_string(blockIndex) + ".onmf";
+            writeMatrixToFile(ABlock, AFilename);
+        }
     }
 
-    for (int blockIndex = 0; blockIndex < _blocks; blockIndex++) {
-        std::string HFilename = _outputDir + "/H/H_block_" + std::to_string(blockIndex) + ".onmf";
-        std::string TFilename = _inputDir + "/T/T_block_" + std::to_string(blockIndex) + ".inmf";
-        _model._thicknessMapFilePath = TFilename;
+    else if (fusionType == BlockWiseSmoothNMFConstants::fusionType::HAADF) {
+        for (int blockIndex = 0; blockIndex < _blocks; blockIndex++) {
+            std::string QFilename = _outputDir + "/Q_optimised/Q_block_" + std::to_string(blockIndex) + ".onmf";
 
-        Eigen::MatrixXd HBlock = readMatrixFromFile(HFilename);
-        Eigen::MatrixXd ABlock = _model.generateAbsorptionCorrectionMatrix(_WClustered, HBlock);
-        
-        std::cout<<"Computed A block : "<<blockIndex + 1<<" / "<<_blocks<<".\n\n";
+            Eigen::MatrixXd QBlock = readMatrixFromFile(QFilename);
+            Eigen::MatrixXd ABlock = _model.generateAbsorptionCorrectionMatrix(QBlock, _model._quantificationElements);
+            
+            std::cout<<"Computed A block : "<<blockIndex + 1<<" / "<<_blocks<<".\n\n";
 
-        std::string AFilename = _outputDir + "/A/A_block_" + std::to_string(blockIndex) + ".onmf";
-        writeMatrixToFile(ABlock, AFilename);
+            std::string AFilename = _outputDir + "/A/A_block_" + std::to_string(blockIndex) + ".onmf";
+            writeMatrixToFile(ABlock, AFilename);
+        }
+    }
+
+    else {
+        throw std::invalid_argument("Estimator Error : Invalid fusion type for computing A blocks.");
     }
 
     std::cout<<"A blocks computed successfully."<<"\n\n";
 }
 
-void BlockWiseSmoothNMF::computeAMatrix() {
+void BlockWiseSmoothNMF::computeAMatrix(BlockWiseSmoothNMFConstants::fusionType fusionType) {
     std::cout<<"Computing monolithic A matrix..."<<"\n";
 
-    if (_WClustered.isZero()) {
-        std::string WClusteredFilename = _outputDir + "/W/W_clustered.onmf";
-        _WClustered = readMatrixFromFile(WClusteredFilename);
+    if (fusionType == BlockWiseSmoothNMFConstants::fusionType::EELS) {
+        if (_WClustered.isZero()) {
+            std::string WClusteredFilename = _outputDir + "/W/W_clustered.onmf";
+            _WClustered = readMatrixFromFile(WClusteredFilename);
+        }
+
+        std::string HFilename = _outputDir + "/H/H_monolithic.onmf";
+        std::string TFilename = _inputDir + "/T/T_monolithic.inmf";
+        _model._thicknessMapFilePath = TFilename;
+
+        Eigen::MatrixXd H = readMatrixFromFile(HFilename);
+        Eigen::MatrixXd A = _model.generateAbsorptionCorrectionMatrix(_WClustered, H);
+
+        std::string AFilename = _outputDir + "/A/A_monolithic.onmf";
+        writeMatrixToFile(A, AFilename);
     }
 
-    std::string HFilename = _outputDir + "/H/H_monolithic.onmf";
-    std::string TFilename = _inputDir + "/T/T_monolithic.inmf";
-    _model._thicknessMapFilePath = TFilename;
+    else if (fusionType == BlockWiseSmoothNMFConstants::fusionType::HAADF) {
+        std::string QFilename = _outputDir + "/Q_optimised/Q_monolithic.onmf";
 
-    Eigen::MatrixXd H = readMatrixFromFile(HFilename);
-    Eigen::MatrixXd A = _model.generateAbsorptionCorrectionMatrix(_WClustered, H);
+        Eigen::MatrixXd Q = readMatrixFromFile(QFilename);
+        Eigen::MatrixXd A = _model.generateAbsorptionCorrectionMatrix(Q, _model._quantificationElements);
 
-    std::string AFilename = _outputDir + "/A/A_monolithic.onmf";
-    writeMatrixToFile(A, AFilename);
+        std::string AFilename = _outputDir + "/A/A_monolithic.onmf";
+        writeMatrixToFile(A, AFilename);
+    }
 
     std::cout<<"Monolithic A matrix computed successfully."<<"\n\n";
 }

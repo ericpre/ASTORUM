@@ -1,9 +1,8 @@
 #include "../include/surrogates.h"
 
-double smoothL2Surrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Eigen::Ref<const Eigen::MatrixXd>& H, const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, double sigmaL, double lambdaL) {
-    Eigen::MatrixXd HoldL = Hold * L;
-    Eigen::MatrixXd HoldLHold = HoldL.cwiseProduct(Hold);
-    double temp0 = HoldLHold.sum();
+double smoothL2Surrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Eigen::Ref<const Eigen::MatrixXd>& H, double sigmaL, double lambdaL) {
+    Eigen::MatrixXd Holdsq = Hold.cwiseProduct(Hold);
+    double temp0 = Holdsq.sum();
     double temp1;
     double temp2;
 
@@ -13,8 +12,8 @@ double smoothL2Surrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Ei
     }
 
     else {
-        Eigen::MatrixXd HoldLH = HoldL.cwiseProduct(H);
-        temp1 = HoldLH.sum();
+        Eigen::MatrixXd HoldH = Hold.cwiseProduct(H);
+        temp1 = HoldH.sum();
         Eigen::MatrixXd diff = Hold - H;
         Eigen::MatrixXd sq = diff.cwiseProduct(diff);
         temp2 = sq.sum();
@@ -23,10 +22,9 @@ double smoothL2Surrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Ei
     return (lambdaL / 2.0 * (2.0 * temp1 - temp0 + sigmaL * temp2));
 }
 
-double smoothDGKLSurrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Eigen::Ref<const Eigen::MatrixXd>& H, const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, double sigmaL, double lambdaL) {
-    Eigen::MatrixXd HoldL = Hold * L;
-    Eigen::MatrixXd HoldLHold = HoldL.cwiseProduct(Hold);
-    double temp0 = HoldLHold.sum();
+double smoothDGKLSurrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Eigen::Ref<const Eigen::MatrixXd>& H, double sigmaL, double lambdaL) {
+    Eigen::MatrixXd Holdsq = Hold.cwiseProduct(Hold);
+    double temp0 = Holdsq.sum();
     double temp1;
     double temp2;
 
@@ -36,8 +34,8 @@ double smoothDGKLSurrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const 
     }
 
     else {
-        Eigen::MatrixXd HoldLH = HoldL.cwiseProduct(H);
-        temp1 = HoldLH.sum();
+        Eigen::MatrixXd HoldH = Hold.cwiseProduct(H);
+        temp1 = HoldH.sum();
         
         Eigen::VectorXd maxHrows = H.rowwise().maxCoeff();
         Eigen::MatrixXd ratio = Hold.cwiseQuotient(H);
@@ -56,18 +54,18 @@ double smoothDGKLSurrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const 
     return (lambdaL / 2.0 * (2.0 * temp1 - temp0 + sigmaL * temp2));
 }
 
-double diffSurrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Eigen::Ref<const Eigen::MatrixXd>& H, const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, double sigmaL, double lambdaL, SmoothNMFConstants::algorithm algorithm) {
+double diffSurrogate(const Eigen::Ref<const Eigen::MatrixXd>& Hold, const Eigen::Ref<const Eigen::MatrixXd>& H, double sigmaL, double lambdaL, SmoothNMFConstants::algorithm algorithm) {
     Eigen::MatrixXd HT = H.transpose();
     double b0;
     double b1;
 
-    b0 = traceXTLX(L, HT, false) * lambdaL / 2.0;
+    b0 = traceXTX(HT, false) * lambdaL / 2.0;
 
     if (algorithm == SmoothNMFConstants::algorithm::LOG_SURROGATE || algorithm == SmoothNMFConstants::algorithm::BMD) 
-        b1 = smoothDGKLSurrogate(Hold, H, L, sigmaL, lambdaL);
+        b1 = smoothDGKLSurrogate(Hold, H, sigmaL, lambdaL);
     
     else if (algorithm == SmoothNMFConstants::algorithm::L2_SURROGATE)
-        b1 = smoothL2Surrogate(Hold, H, L, sigmaL, lambdaL);
+        b1 = smoothL2Surrogate(Hold, H, sigmaL, lambdaL);
     
     else
         throw std::invalid_argument("Surrogates Error : Invalid surrogate algorithm.");

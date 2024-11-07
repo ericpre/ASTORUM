@@ -271,9 +271,9 @@ class BlockWiseSmoothNMF {
 
         void computeHMatrixSVD();
 
-        void computeABlocks();
+        void computeABlocks(BlockWiseSmoothNMFConstants::fusionType fusionType);
 
-        void computeAMatrix();
+        void computeAMatrix(BlockWiseSmoothNMFConstants::fusionType fusionType);
 };
 
 #endif

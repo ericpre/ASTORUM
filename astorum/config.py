@@ -1,11 +1,4 @@
-import os
 import sys
-import hyperspy.api as hs
-import dask.array as da
-import exspy
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import List, Tuple, Optional
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent.parent

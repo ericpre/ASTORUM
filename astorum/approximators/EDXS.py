@@ -1,106 +1,12 @@
-from BlockWiseSmoothNMFModule.config import *
-import BlockWiseSmoothNMFlib
-
-# Utility functions
-
-def writeArrayToFile(filename : str, array : np.ndarray) -> None:
-    array = np.asarray(array)
-    with open(filename, 'w') as file:
-        if array.ndim == 1:
-            file.write(f"{array.shape[0]}\n")
-            row_str = ' '.join(map(str, array))
-            file.write(f"{row_str}\n")
-        elif array.ndim == 2:
-            file.write(f"{array.shape[0]} {array.shape[1]}\n")
-            for row in array:
-                row_str = ' '.join(map(str, row))
-                file.write(f"{row_str}\n")
-        else:
-            raise ValueError("Input array must be 1D or 2D")
-       
-        
-def readArrayFromFile(filename : str) -> np.ndarray:
-    with open(filename) as file:
-        dims = list(map(int, file.readline().split()))
-        
-        if len(dims) == 1: 
-            
-            size = dims[0]
-            array = np.zeros(size)
-            
-            values = list(map(float, file.readline().split()))
-            array[:] = values
-            
-        elif len(dims) == 2:
-            rows, cols = dims
-            array = np.zeros((rows, cols))
-            
-            for i in range(rows):
-                row_values = list(map(float, file.readline().split()))
-                array[i, :] = row_values
-                
-        else:
-            raise ValueError("Invalid dimension format in file.")
-    
-    return array
-
-
-def plot_data_model_ROI(dataset, G, W, H, elementList):   
-    WH = np.matmul(W, H)
-
-    contributions = [hs.signals.Signal1D((G[:, [i]] @ (WH)[[i], :]).T.reshape(dataset.data.shape)) for i in range(G.shape[1])]
-    contributions.append(hs.signals.Signal1D((np.matmul(G, WH)).T.reshape(dataset.data.shape)))
-
-    titles = elementList + ["Background 1", "Background 2", "Full Model"]
-    for i, c in enumerate(contributions):
-        for a, b in zip(c.axes_manager._axes, dataset.axes_manager._axes):
-            a.update_from(b)
-        c.metadata.General.title = titles[i]
-
-    fig, ax = plt.subplots()
-    dataset.plot()
-
-    roi = hs.roi.RectangularROI(left = dataset.axes_manager[1].index, top = dataset.axes_manager[0].index, right = dataset.axes_manager[1].size, bottom = dataset.axes_manager[0].size)
-    
-    imr = roi.interactive(dataset, color = 'green').sum(axis = 0).sum(axis = 0)
-    contributions_roi = [roi.interactive(g, None).sum(axis = 0).sum(axis = 0) for g in contributions]
-
-    spectra = [imr] + contributions_roi
-    lines = []
-    
-    line, = ax.plot(dataset.axes_manager.signal_axes[0].axis, imr.data, label = imr.metadata.General.title, linestyle = "-")
-    lines.append(line)
-    
-    for spectrum in contributions_roi:
-        line, = ax.plot(dataset.axes_manager.signal_axes[0].axis, spectrum.data, label = spectrum.metadata.General.title, linestyle = "--")
-        lines.append(line)
-    
-    ax.legend()
-    ax.set_xlabel("Energy (keV)")
-    ax.set_ylabel("Intensity")
-    ax.set_title("EDXS Model Fit")
-
-    def update_plot(*args, **kwargs):
-        imr = roi.interactive(dataset, color = 'green').sum(axis = 0).sum(axis = 0)
-        contributions_roi = [roi.interactive(g, None).sum(axis = 0).sum(axis = 0) for g in contributions]
-
-        all_data = [imr] + contributions_roi
-        for line, new_data in zip(lines, all_data):
-            line.set_ydata(new_data.data)
-
-        ax.relim()
-        ax.autoscale_view()
-        fig.canvas.draw_idle()
-
-    roi.events.changed.connect(update_plot)
-    update_plot()
-    plt.show()
-
-    return
-        
-       
-        
-# Wrapper class for SmoothNMF
+import os
+import hyperspy.api as hs
+import dask.array as da
+import exspy
+import numpy as np
+from typing import List, Tuple, Optional
+import astorum.core as core
+from astorum.config import *
+from astorum.io import *
 
 class SmoothNMF:
     def __init__(
@@ -187,36 +93,36 @@ class SmoothNMF:
             energyAxisOffset = np.float64(dataset.axes_manager[2].offset)
             
         if (elements is None):
-            elements = BlockWiseSmoothNMFlib.StringVector(dataset.metadata.Sample.elements)
+            elements = core.StringVector(dataset.metadata.Sample.elements)
         else:
-            elements = BlockWiseSmoothNMFlib.StringVector(elements)
+            elements = core.StringVector(elements)
             
         if (splitLinesElements is None):
-            splitLinesElements = BlockWiseSmoothNMFlib.StringVector([])
+            splitLinesElements = core.StringVector([])
         else:
-            splitLinesElements = BlockWiseSmoothNMFlib.StringVector(splitLinesElements)
+            splitLinesElements = core.StringVector(splitLinesElements)
         
         if (energyThresholds is None):
-            energyThresholds = BlockWiseSmoothNMFlib.DoubleVector([])
+            energyThresholds = core.DoubleVector([])
         else:
-            energyThresholds = BlockWiseSmoothNMFlib.DoubleVector(energyThresholds)
+            energyThresholds = core.DoubleVector(energyThresholds)
         
         if (quantificationElements is None):
-            quantificationElements = BlockWiseSmoothNMFlib.StringVector([])
+            quantificationElements = core.StringVector([])
         else:
-            quantificationElements = BlockWiseSmoothNMFlib.StringVector(quantificationElements)
+            quantificationElements = core.StringVector(quantificationElements)
             
         if (absorptionElements is None):
-            absorptionElements = BlockWiseSmoothNMFlib.StringVector([])
+            absorptionElements = core.StringVector([])
         else:
-            absorptionElements = BlockWiseSmoothNMFlib.StringVector(absorptionElements)
+            absorptionElements = core.StringVector(absorptionElements)
             
         if (absorptionElementsConcentrations is None):
             absorptionElementsConcentrations = np.ascontiguousarray(np.zeros(shape = (2), dtype = np.float64))
         else:
             absorptionElementsConcentrations = np.ascontiguousarray(absorptionElementsConcentrations, dtype = np.float64)
         
-        Gcols = BlockWiseSmoothNMFlib.countGcolumns(elements, splitLinesElements) + 2
+        Gcols = core.countGcolumns(elements, splitLinesElements) + 2
         
         if (W is None):
             W = np.ascontiguousarray(np.zeros(shape = [Gcols, components], dtype = np.float64))
@@ -237,16 +143,16 @@ class SmoothNMF:
         
         match init:
             case "RANDOM":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.RANDOM
+                init = core.SmoothNMFConstants_initialisation.RANDOM
             
             case "NNDSVD":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVD
+                init = core.SmoothNMFConstants_initialisation.NNDSVD
                 
             case "NNDSVDA":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVDA
+                init = core.SmoothNMFConstants_initialisation.NNDSVDA
                 
             case "NNDSVDAR":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVDAR
+                init = core.SmoothNMFConstants_initialisation.NNDSVDAR
                 
             case _:
                 raise ValueError("Invalid initialisation method.")
@@ -256,16 +162,16 @@ class SmoothNMF:
         
         match algorithm:
             case "LOG_SURROGATE":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.LOG_SURROGATE
+                algorithm = core.SmoothNMFConstants_algorithm.LOG_SURROGATE
                 
             case "L2_SURROGATE":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.L2_SURROGATE
+                algorithm = core.SmoothNMFConstants_algorithm.L2_SURROGATE
                 
             case "PROJECTED_GRADIENT":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.PROJECTED_GRADIENT
+                algorithm = core.SmoothNMFConstants_algorithm.PROJECTED_GRADIENT
                 
             case "BMD":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.BMD
+                algorithm = core.SmoothNMFConstants_algorithm.BMD
                 
             case _:
                 raise ValueError("Invalid algorithm.")
@@ -292,26 +198,26 @@ class SmoothNMF:
         
         match problemType:
             case "IDENTITY":
-                problemType = BlockWiseSmoothNMFlib.EDXSModelConstants_problemType.IDENTITY
+                problemType = core.EDXSModelConstants_problemType.IDENTITY
                 
             case "NO_BREMSSTRAHLUNG":
-                problemType = BlockWiseSmoothNMFlib.EDXSModelConstants_problemType.NO_BREMSSTRAHLUNG
+                problemType = core.EDXSModelConstants_problemType.NO_BREMSSTRAHLUNG
         
             case "BREMSSTRAHLUNG":
-                problemType = BlockWiseSmoothNMFlib.EDXSModelConstants_problemType.BREMSSTRAHLUNG
+                problemType = core.EDXSModelConstants_problemType.BREMSSTRAHLUNG
                 
             case _:
                 raise ValueError("Invalid problem type.")
             
         match absorptionModelType:
             case "INTERNAL":
-                absorptionModelType = BlockWiseSmoothNMFlib.EDXSModelConstants_absorptionModelType.INTERNAL
+                absorptionModelType = core.EDXSModelConstants_absorptionModelType.INTERNAL
                 
             case "EXTERNAL":
-                absorptionModelType = BlockWiseSmoothNMFlib.EDXSModelConstants_absorptionModelType.EXTERNAL
+                absorptionModelType = core.EDXSModelConstants_absorptionModelType.EXTERNAL
                 
             case "NONE":
-                absorptionModelType = BlockWiseSmoothNMFlib.EDXSModelConstants_absorptionModelType.NONE
+                absorptionModelType = core.EDXSModelConstants_absorptionModelType.NONE
                 
             case _:
                 raise ValueError("Invalid absorption model type.")
@@ -329,7 +235,7 @@ class SmoothNMF:
         thicknessMapFilePath = str(thicknessMapFilePath)
         periodicTableInfoFilePath = str(periodicTableInfoFilePath)
         
-        snmf = BlockWiseSmoothNMFlib.SmoothNMF(X, W, H, fixedW, fixedH, gammaStepArray, 
+        snmf = core.SmoothNMF(X, W, H, fixedW, fixedH, gammaStepArray, 
                                     components, init, maxIter, randomSeed, algorithm, 
                                     tol, logShift, eps, lambdaL, mu, epsilonReg, dichotomyTol, sigmaL, gammaStepScalar, 
                                     simplexW, simplexH, l2, verbose, safe, debug, normalise, noStopCriterion, lineSearch)
@@ -343,6 +249,7 @@ class SmoothNMF:
         
         self.estimator = snmf
         self.dataset = dataset
+        self.Q = None
     
     
     def fitTransform(self) -> None:
@@ -369,19 +276,71 @@ class SmoothNMF:
         else:
             Q = self.estimator.model.generateQuantificationMatrix(W, H, self.estimator.model.quantificationElements)
             
+        self.Q = Q
         quant = hs.signals.Signal2D(Q.reshape((Q.shape[0], self.dataset.data.shape[0], self.dataset.data.shape[1])))
         
         return (spectra, loadings, quant)
     
     
-    def computeDensityMap(self) -> np.ndarray:
-        W = self.estimator.W
-        H = self.estimator.H
-        
-        D = self.estimator.model.computeDensityMap(W, H)
+    def computeDensityMap(self, Q : np.ndarray = None, elements : List[str] = None) -> np.ndarray:
+        if (Q is not None and elements is not None):
+            Q = np.ascontiguousarray(Q, dtype = np.float64)
+            elements = core.StringVector(elements)
+            D = self.estimator.model.computeDensityMap(Q, elements)
+            
+        else:
+            W = self.estimator.W
+            H = self.estimator.H
+            D = self.estimator.model.computeDensityMap(W, H)
         
         return D
     
+    
+    def optimiseQuantificationData(
+        self, 
+        HAADF : hs.signals.Signal2D,
+        gamma : np.float64 = 1.6, 
+        lambdaHAADF : np.float64 = None, 
+        lambdaChem : np.float64 = 0.08, 
+        lambdaTV : np.float64 = 0.15, 
+        epsilon : np.float64 = 0.24, 
+        nIter : int = 30, 
+        nIterTV : int = 3, 
+        regularise : bool = True
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        
+        if (self.Q is None):
+            raise ValueError("Quantification matrix has not been computed. Run getDecompositionResults() first.")
+        
+        if (lambdaHAADF is None):
+            lambdaHAADF = 1 / self.Q.shape[0]
+        
+        gamma = np.float64(gamma)
+        lambdaHAADF = np.float64(lambdaHAADF)
+        lambdaChem = np.float64(lambdaChem)
+        lambdaTV = np.float64(lambdaTV)
+        epsilon = np.float64(epsilon)
+        nIter = int(nIter)
+        nIterTV = int(nIterTV)
+        regularise = bool(regularise)
+        
+        xDim = int(HAADF.data.shape[0])
+        yDim = int(HAADF.data.shape[1])
+        XInit = np.ascontiguousarray(HAADF.data.reshape((HAADF.data.shape[0] * HAADF.data.shape[1])), dtype = np.float64)
+        self.Q = np.ascontiguousarray(self.Q, dtype = np.float64)
+        costHAADF = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+        costChem = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+        costTV = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+        
+        fusion = core.HAADFDataset(xDim, yDim, XInit)
+        fusion.loadEDXSQuantificationData(self.Q, self.estimator.model.quantificationElements, self.estimator.model.periodicTableInfoFilePath)
+        fusion.runQuantificationDataOptimisationRoutine(gamma, lambdaHAADF, lambdaChem, lambdaTV, epsilon, nIter, nIterTV, costHAADF, costChem, costTV, regularise)
+        
+        QOptimised = fusion.Q
+        XOptimised = fusion.X
+        
+        return (QOptimised, XOptimised, costHAADF, costChem, costTV)
+        
     
     def computeThicknessMap(self, LL : exspy.signals.EELSSpectrum, D : np.ndarray, ZLP_threshold : np.float64, outputFilePath : str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> np.ndarray:
         X = np.ascontiguousarray(LL.data.reshape((LL.data.shape[0] * LL.data.shape[1], LL.data.shape[2])).T, dtype = np.float64)
@@ -400,7 +359,7 @@ class SmoothNMF:
             
             os.environ['OMP_NUM_THREADS'] = numThreads
         
-        EELS = BlockWiseSmoothNMFlib.EELSDataset(X, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, D, alpha, beta, ZLP_threshold)
+        EELS = core.EELSDataset(X, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, D, alpha, beta, ZLP_threshold)
         EELS.computeThicknessMap()
         
         writeArrayToFile(outputFilePath, EELS.T)
@@ -408,17 +367,27 @@ class SmoothNMF:
         return EELS.T
         
     
-    def computeAbsorptionCorrectionMatrix(self, thicknessMapFilePath : str, outputDirectory : str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> np.ndarray:
-        self.estimator.model.thicknessMapFilePath = thicknessMapFilePath
+    def computeAbsorptionCorrectionMatrix(self, thicknessMapFilePath : str = None, Q : np.ndarray = None, elements : List[str] = None, outputDirectory : str = None, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> np.ndarray:
+        if (thicknessMapFilePath is not None and (Q is not None or elements is not None)):
+            raise ValueError("Thickness map and quantification data cannot be provided simultaneously.")
         
+        if (outputDirectory is None):
+            outputDirectory = os.getcwd()
+            
         if (useOpenMP):
             if (numThreads is None):
                 numThreads = str(os.cpu_count())
             
             os.environ['OMP_NUM_THREADS'] = numThreads
         
-        A = self.estimator.model.generateAbsorptionCorrectionMatrix(self.estimator.W, self.estimator.H)
-                
+        if (thicknessMapFilePath is not None):
+            self.estimator.model.thicknessMapFilePath = thicknessMapFilePath
+            A = self.estimator.model.generateAbsorptionCorrectionMatrix(self.estimator.W, self.estimator.H)
+        
+        elif (Q is not None and elements is not None):
+            Q = np.ascontiguousarray(Q, dtype = np.float64)
+            elements = core.StringVector(elements)
+            A = self.estimator.model.generateAbsorptionCorrectionMatrix(Q, elements)        
         
         writeArrayToFile(outputDirectory + "/A.onmf", A)
         
@@ -451,11 +420,10 @@ class SmoothNMF:
 
 
     def printConcentrationReport(self, fitError : Optional[bool] = True):
-        BlockWiseSmoothNMFlib.printConcentrationReport(self.estimator.G, self.estimator.W, self.estimator.H, self.estimator.model.modelElements, self.estimator.model.quantificationElements, fitError)
+        core.printConcentrationReport(self.estimator.G, self.estimator.W, self.estimator.H, self.estimator.model.modelElements, self.estimator.model.quantificationElements, fitError)
         
-
-# Wrapper class for BlockWiseSmoothNMF
-
+        
+        
 class BlockWiseSmoothNMF:
     def writeXBlocks(self, dataArray : np.ndarray, outputDirectory : str) -> None:
         blockIndex = 0
@@ -565,29 +533,29 @@ class BlockWiseSmoothNMF:
             energyAxisOffset = np.float64(dataset.axes_manager[2].offset)
             
         if (elements is None):
-            elements = BlockWiseSmoothNMFlib.StringVector(dataset.metadata.Sample.elements)
+            elements = core.StringVector(dataset.metadata.Sample.elements)
         else:
-            elements = BlockWiseSmoothNMFlib.StringVector(elements)
+            elements = core.StringVector(elements)
             
         if (splitLinesElements is None):
-            splitLinesElements = BlockWiseSmoothNMFlib.StringVector([])
+            splitLinesElements = core.StringVector([])
         else:
-            splitLinesElements = BlockWiseSmoothNMFlib.StringVector(splitLinesElements)
+            splitLinesElements = core.StringVector(splitLinesElements)
         
         if (energyThresholds is None):
-            energyThresholds = BlockWiseSmoothNMFlib.DoubleVector([])
+            energyThresholds = core.DoubleVector([])
         else:
-            energyThresholds = BlockWiseSmoothNMFlib.DoubleVector(energyThresholds)
+            energyThresholds = core.DoubleVector(energyThresholds)
             
         if (quantificationElements is None):
-            quantificationElements = BlockWiseSmoothNMFlib.StringVector([])
+            quantificationElements = core.StringVector([])
         else:
-            quantificationElements = BlockWiseSmoothNMFlib.StringVector(quantificationElements)
+            quantificationElements = core.StringVector(quantificationElements)
             
         if (absorptionElements is None):
-            absorptionElements = BlockWiseSmoothNMFlib.StringVector([])
+            absorptionElements = core.StringVector([])
         else:
-            absorptionElements = BlockWiseSmoothNMFlib.StringVector(absorptionElements)
+            absorptionElements = core.StringVector(absorptionElements)
             
         if (absorptionElementsConcentrations is None):
             absorptionElementsConcentrations = np.ascontiguousarray(np.zeros(shape = (2), dtype = np.float64))
@@ -596,26 +564,26 @@ class BlockWiseSmoothNMF:
         
         match problemType:
             case "IDENTITY":
-                problemType = BlockWiseSmoothNMFlib.EDXSModelConstants_problemType.IDENTITY
+                problemType = core.EDXSModelConstants_problemType.IDENTITY
                 
             case "NO_BREMSSTRAHLUNG":
-                problemType = BlockWiseSmoothNMFlib.EDXSModelConstants_problemType.NO_BREMSSTRAHLUNG
+                problemType = core.EDXSModelConstants_problemType.NO_BREMSSTRAHLUNG
         
             case "BREMSSTRAHLUNG":
-                problemType = BlockWiseSmoothNMFlib.EDXSModelConstants_problemType.BREMSSTRAHLUNG
+                problemType = core.EDXSModelConstants_problemType.BREMSSTRAHLUNG
                 
             case _:
                 raise ValueError("Invalid problem type.")
             
         match absorptionModelType:
             case "INTERNAL":
-                absorptionModelType = BlockWiseSmoothNMFlib.EDXSModelConstants_absorptionModelType.INTERNAL
+                absorptionModelType = core.EDXSModelConstants_absorptionModelType.INTERNAL
                 
             case "EXTERNAL":
-                absorptionModelType = BlockWiseSmoothNMFlib.EDXSModelConstants_absorptionModelType.EXTERNAL
+                absorptionModelType = core.EDXSModelConstants_absorptionModelType.EXTERNAL
                 
             case "NONE":
-                absorptionModelType = BlockWiseSmoothNMFlib.EDXSModelConstants_absorptionModelType.NONE
+                absorptionModelType = core.EDXSModelConstants_absorptionModelType.NONE
                 
             case _:
                 raise ValueError("Invalid absorption model type.")
@@ -633,7 +601,7 @@ class BlockWiseSmoothNMF:
         thicknessMapFilePath = str(thicknessMapFilePath)
         periodicTableInfoFilePath = str(periodicTableInfoFilePath)
         
-        bwsnmf = BlockWiseSmoothNMFlib.BlockWiseSmoothNMF(inputDir, outputDir, blockStructure[0], blockStructure[1], blockWidth, blockHeight, nClusters, componentsVector)
+        bwsnmf = core.BlockWiseSmoothNMF(inputDir, outputDir, blockStructure[0], blockStructure[1], blockWidth, blockHeight, nClusters, componentsVector)
         
         bwsnmf.initialiseModel(beamEnergy, problemType, absorptionModelType, 
                     azimuthAngle, elevationAngle, tiltStage, thickness, density, widthSlope, widthIntercept, 
@@ -693,16 +661,16 @@ class BlockWiseSmoothNMF:
             
         match init:
             case "RANDOM":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.RANDOM
+                init = core.SmoothNMFConstants_initialisation.RANDOM
             
             case "NNDSVD":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVD
+                init = core.SmoothNMFConstants_initialisation.NNDSVD
                 
             case "NNDSVDA":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVDA
+                init = core.SmoothNMFConstants_initialisation.NNDSVDA
                 
             case "NNDSVDAR":
-                init = BlockWiseSmoothNMFlib.SmoothNMFConstants_initialisation.NNDSVDAR
+                init = core.SmoothNMFConstants_initialisation.NNDSVDAR
                 
             case _:
                 raise ValueError("Invalid initialisation method.")
@@ -712,16 +680,16 @@ class BlockWiseSmoothNMF:
         
         match algorithm:
             case "LOG_SURROGATE":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.LOG_SURROGATE
+                algorithm = core.SmoothNMFConstants_algorithm.LOG_SURROGATE
                 
             case "L2_SURROGATE":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.L2_SURROGATE
+                algorithm = core.SmoothNMFConstants_algorithm.L2_SURROGATE
                 
             case "PROJECTED_GRADIENT":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.PROJECTED_GRADIENT
+                algorithm = core.SmoothNMFConstants_algorithm.PROJECTED_GRADIENT
                 
             case "BMD":
-                algorithm = BlockWiseSmoothNMFlib.SmoothNMFConstants_algorithm.BMD
+                algorithm = core.SmoothNMFConstants_algorithm.BMD
                 
             case _:
                 raise ValueError("Invalid algorithm.")
@@ -758,31 +726,31 @@ class BlockWiseSmoothNMF:
         
         match metric:
             case "EUCLIDEAN":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.EUCLIDEAN
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.EUCLIDEAN
                 p = int(2)
                 
             case "MANHATTAN":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.MANHATTAN
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.MANHATTAN
                 p = int(1)
                 
             case "MAHALANOBIS":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.MAHALANOBIS
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.MAHALANOBIS
                 
             case "MINKOWSKI":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.MINKOWSKI
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.MINKOWSKI
                 p = int(p)
                 
             case "COSINE":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.COSINE
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.COSINE
                 
             case "CHEBYSHEV":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.CHEBYSHEV
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.CHEBYSHEV
             
             case "HAMMING":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.HAMMING
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.HAMMING
                 
             case "JACCARD":
-                metric = BlockWiseSmoothNMFlib.BlockWiseSmoothNMFConstants_distanceMetric.JACCARD
+                metric = core.BlockWiseSmoothNMFConstants_distanceMetric.JACCARD
                 
             case _:
                 raise ValueError("Invalid metric.")
@@ -928,6 +896,123 @@ class BlockWiseSmoothNMF:
         D = self.estimator.model.computeDensityMap(W, H).reshape((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
         
         return D
+    
+    
+    def optimiseQuantificationMaps(
+        self, 
+        HAADF : hs.signals.Signal2D,
+        gamma : np.float64 = 1.6, 
+        lambdaHAADF : np.float64 = None, 
+        lambdaChem : np.float64 = 0.08, 
+        lambdaTV : np.float64 = 0.15, 
+        epsilon : np.float64 = 0.24, 
+        nIter : int = 30, 
+        nIterTV : int = 3, 
+        regularise : bool = True
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        
+        pathZ = os.path.join(self.estimator.inputDir, "Z")
+        pathQOptimised = os.path.join(self.estimator.outputDir, "Q_optimised")
+        pathZOptimised = os.path.join(self.estimator.outputDir, "Z_optimised")
+        os.makedirs(pathZ, exist_ok = True)
+        os.makedirs(pathQOptimised, exist_ok = True)
+        os.makedirs(pathZOptimised, exist_ok = True)
+        
+        HAADF.rechunk((int(self.estimator.blockHeight), int(self.estimator.blockWidth)))
+        
+        if (lambdaHAADF is None):
+            lambdaHAADF = 1 / int(len(list(self.estimator.model.elements)))
+        
+        gamma = np.float64(gamma)
+        lambdaHAADF = np.float64(lambdaHAADF)
+        lambdaChem = np.float64(lambdaChem)
+        lambdaTV = np.float64(lambdaTV)
+        epsilon = np.float64(epsilon)
+        nIter = int(nIter)
+        nIterTV = int(nIterTV)
+        regularise = bool(regularise)
+        
+        costsHAADF = np.zeros((self.blocks, nIter), dtype = np.float64)
+        costsChem = np.zeros((self.blocks, nIter), dtype = np.float64)
+        costsTV = np.zeros((self.blocks, nIter), dtype = np.float64)
+        
+        for i in range(self.blockStructure[0]):
+            for j in range(self.blockStructure[1]):
+                XInitBlock = HAADF.data.blocks[i, j].compute()
+                XInitBlock = np.ascontiguousarray(XInitBlock.reshape((XInitBlock.shape[0] * XInitBlock.shape[1])), dtype = np.float64)
+                QFilename = self.estimator.outputDir + "/Q/Q_block_" + str(i * int(self.blockStructure[1]) + j) + ".onmf"
+                QBlock = readArrayFromFile(QFilename)
+                
+                costHAADF = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+                costChem = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+                costTV = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+                
+                fusion = core.HAADFDataset(int(self.estimator.blockHeight), int(self.estimator.blockWidth), XInitBlock)
+                fusion.loadEDXSQuantificationData(QBlock, self.estimator.model.quantificationElements, self.estimator.model.periodicTableInfoFilePath)
+                fusion.runQuantificationDataOptimisationRoutine(gamma, lambdaHAADF, lambdaChem, lambdaTV, epsilon, nIter, nIterTV, costHAADF, costChem, costTV, regularise)
+                
+                QOptimisedFilename = pathQOptimised + "/Q_block_" + str(i * int(self.blockStructure[1]) + j) + ".onmf"
+                ZOptimisedFilename = pathZOptimised + "/Z_block_" + str(i * int(self.blockStructure[1]) + j) + ".onmf"
+                writeArrayToFile(QOptimisedFilename, fusion.Q)
+                writeArrayToFile(ZOptimisedFilename, fusion.X)
+                
+                costsHAADF[i * int(self.blockStructure[1]) + j, :] = costHAADF
+                costsChem[i * int(self.blockStructure[1]) + j, :] = costChem
+                costsTV[i * int(self.blockStructure[1]) + j, :] = costTV
+        
+        return (costsHAADF, costsChem, costsTV)
+    
+    
+    def optimiseQuantificationMap(
+        self, 
+        HAADF : hs.signals.Signal2D,
+        gamma : np.float64 = 1.6, 
+        lambdaHAADF : np.float64 = None, 
+        lambdaChem : np.float64 = 0.08, 
+        lambdaTV : np.float64 = 0.15, 
+        epsilon : np.float64 = 0.24, 
+        nIter : int = 30, 
+        nIterTV : int = 3, 
+        regularise : bool = True
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        
+        pathZ = os.path.join(self.estimator.inputDir, "Z")
+        pathQOptimised = os.path.join(self.estimator.outputDir, "Q_optimised")
+        pathZOptimised = os.path.join(self.estimator.outputDir, "Z_optimised")
+        os.makedirs(pathZ, exist_ok = True)
+        os.makedirs(pathQOptimised, exist_ok = True)
+        os.makedirs(pathZOptimised, exist_ok = True)
+        
+        if (lambdaHAADF is None):
+            lambdaHAADF = 1 / int(len(list(self.estimator.model.elements)))
+        
+        gamma = np.float64(gamma)
+        lambdaHAADF = np.float64(lambdaHAADF)
+        lambdaChem = np.float64(lambdaChem)
+        lambdaTV = np.float64(lambdaTV)
+        epsilon = np.float64(epsilon)
+        nIter = int(nIter)
+        nIterTV = int(nIterTV)
+        regularise = bool(regularise)
+        
+        XInit = np.ascontiguousarray(HAADF.data.reshape((HAADF.data.shape[0] * HAADF.data.shape[1])), dtype = np.float64)
+        QFilename = self.estimator.outputDir + "/Q/Q_monolithic.onmf"
+        Q = readArrayFromFile(QFilename)
+                
+        costHAADF = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+        costChem = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+        costTV = np.ascontiguousarray(np.zeros(shape = (nIter), dtype = np.float64))
+        
+        fusion = core.HAADFDataset(int(self.estimator.blockHeight), int(self.estimator.blockWidth), XInit)
+        fusion.loadEDXSQuantificationData(Q, self.estimator.model.quantificationElements, self.estimator.model.periodicTableInfoFilePath)
+        fusion.runQuantificationDataOptimisationRoutine(gamma, lambdaHAADF, lambdaChem, lambdaTV, epsilon, nIter, nIterTV, costHAADF, costChem, costTV, regularise)
+        
+        QOptimisedFilename = pathQOptimised + "/Z_monolithic.onmf"
+        ZOptimisedFilename = pathZOptimised + "/Z_monolithic.onmf"
+        writeArrayToFile(QOptimisedFilename, fusion.Q)
+        writeArrayToFile(ZOptimisedFilename, fusion.X)
+        
+        return (costHAADF, costChem, costTV)
 
 
     def computeThicknessMaps(self, LL : exspy.signals.LazyEELSSpectrum, D : np.ndarray, ZLP_threshold : np.float64, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
@@ -954,7 +1039,7 @@ class BlockWiseSmoothNMF:
                 LLBlock = LLBlock.T
                 DBlock = D[i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)]
                 DBlock = DBlock.reshape((DBlock.shape[0] * DBlock.shape[1]))
-                EELS = BlockWiseSmoothNMFlib.EELSDataset(LLBlock, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, DBlock, alpha, beta, ZLP_threshold)
+                EELS = core.EELSDataset(LLBlock, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, DBlock, alpha, beta, ZLP_threshold)
                 EELS.computeThicknessMap()
                 TFilename = self.estimator.inputDir + "/T/T_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf"
                 writeArrayToFile(TFilename, EELS.T)
@@ -978,7 +1063,7 @@ class BlockWiseSmoothNMF:
         LLMatrix = LL.data.reshape((LL.data.shape[0] * LL.data.shape[1], LL.data.shape[2]))
         LLMatrix = LLMatrix.T
         D = D.reshape((D.shape[0] * D.shape[1]))
-        EELS = BlockWiseSmoothNMFlib.EELSDataset(LLMatrix, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, D, alpha, beta, ZLP_threshold)
+        EELS = core.EELSDataset(LLMatrix, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, D, alpha, beta, ZLP_threshold)
         EELS.computeThicknessMap()
         TFilename = self.estimator.inputDir + "/T/T_monolithic.inmf"
         writeArrayToFile(TFilename, EELS.T)
@@ -997,47 +1082,34 @@ class BlockWiseSmoothNMF:
         return T
     
     
-    def computeAbsorptionCorrectionMatrices(self, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
+    def computeAbsorptionCorrectionMatrices(self, fusionType : str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
+        if (useOpenMP):
+            if (numThreads is None):
+                numThreads = str(os.cpu_count())
+            
+            os.environ['OMP_NUM_THREADS'] = numThreads
+            
+        if (fusionType == "EELS"):
+            self.estimator.computeABlocks(core.EDXSModelConstants_fusionType.EELS)
+        elif (fusionType == "HAADF"):
+            self.estimator.computeABlocks(core.EDXSModelConstants_fusionType.HAADF)
+        else :
+            raise ValueError("Invalid fusion type.")
+    
+    
+    def computeAbsorptionCorrectionMatrix(self, fusionType :str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
         if (useOpenMP):
             if (numThreads is None):
                 numThreads = str(os.cpu_count())
             
             os.environ['OMP_NUM_THREADS'] = numThreads
         
-        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
-        W = np.nan_to_num(W, nan = 1E-14)
-        
-        for i in range(int(self.blockStructure[0])):
-            for j in range(int(self.blockStructure[1])):
-                TFilename = self.estimator.inputDir + "/T/T_block_" + str(i * int(self.blockStructure[1]) + j) + ".inmf"
-                self.estimator.model.thicknessMapFilePath = TFilename
-                HFilename = self.estimator.outputDir + "/H/H_block_" + str(i * int(self.blockStructure[1]) + j) + ".onmf"
-                HBlock = readArrayFromFile(HFilename)
-                HBlock = np.nan_to_num(HBlock, nan = 1E-14)
-                A = self.estimator.model.generateAbsorptionCorrectionMatrix(W, HBlock)
-                AFilename = self.estimator.outputDir + "/A/A_block_" + str(i * int(self.blockStructure[1]) + j) + ".onmf"
-                writeArrayToFile(AFilename, A)
-    
-    
-    def computeAbsorptionCorrectionMatrix(self, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
-        if (useOpenMP):
-            if (numThreads is None):
-                numThreads = str(os.cpu_count())
-            
-            os.environ['OMP_NUM_THREADS'] = numThreads
-        
-        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
-        W = np.nan_to_num(W, nan = 1E-14)
-        
-        TFilename = self.estimator.inputDir + "/T/T_monolithic.inmf"
-        self.estimator.model.thicknessMapFilePath = TFilename
-        
-        H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
-        H = np.nan_to_num(H, nan = 1E-14)
-        
-        A = self.estimator.model.generateAbsorptionCorrectionMatrix(W, H)
-        AFilename = self.estimator.outputDir + "/A/A_monolithic.onmf"
-        writeArrayToFile(AFilename, A)
+        if (fusionType == "EELS"):
+            self.estimator.computeAMatrix()
+        elif (fusionType == "HAADF"):
+            self.estimator.computeAMatrix(core.EDXSModelConstants_fusionType.HAADF)
+        else :
+            raise ValueError("Invalid fusion type.")
     
     
     def readABlocks(self) -> np.ndarray:
@@ -1196,4 +1268,6 @@ class BlockWiseSmoothNMF:
         elif (self.spatialComputationApproach == "MONOLITHIC"):
             H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
             
-        BlockWiseSmoothNMFlib.printConcentrationReport(G, W, H, self.estimator.model.modelElements, self.estimator.model.quantificationElements, fitError)
+        core.printConcentrationReport(G, W, H, self.estimator.model.modelElements, self.estimator.model.quantificationElements, fitError)
+        
+        

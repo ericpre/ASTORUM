@@ -23,7 +23,7 @@ ehthumbs.db
 .DS_Store?
 .Trashes
 
-BlockWiseSmoothNMF.egg-info
+astorum.egg-info
 examples/output
 examples/output_ext_abs
 cpp/build
@@ -33,4 +33,6 @@ cpp/cmake_install.cmake
 cpp/out
 cpp/install_manifest.txt
 cpp/Makefile
-BlockWiseSmoothNMFModule/__pycache__
+astorum/__pycache__
+astorum/approximators/__pycache__
+astorum/utilities/__pycache__

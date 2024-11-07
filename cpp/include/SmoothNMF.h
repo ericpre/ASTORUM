@@ -47,7 +47,6 @@ class NMFEstimator {
         Eigen::MatrixXd _G;
         Eigen::MatrixXd _fixedW;
         Eigen::MatrixXd _fixedH;
-        Eigen::SparseMatrix<double> _L;
 
         EDXSDataset _model;
 

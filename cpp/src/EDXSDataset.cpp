@@ -78,7 +78,7 @@ EDXSDataset::EDXSDataset(
     _azimuthAngle = azimuthAngle;
     _elevationAngle = elevationAngle;
     _tiltStage = tiltStage;
-    _thickness = thickness;
+    _thickness = thickness * 1E-7;
     _density = density;
     _widthSlope = widthSlope;
     _widthIntercept = widthIntercept;
@@ -512,6 +512,21 @@ Eigen::VectorXd EDXSDataset::computeDensityMap(const Eigen::Ref<const Eigen::Mat
     return D;
 }
 
+Eigen::VectorXd EDXSDataset::computeDensityMap(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements) {
+    Eigen::VectorXd D = Eigen::VectorXd::Zero(Q.cols());
+
+    if (elements.size() != Q.rows()) {
+        throw std::invalid_argument("EDXS Model Error : Number of elements and rows in quantification data matrix do not match.");
+    }
+
+    for (int j = 0; j < Q.cols(); j++) {
+        Eigen::VectorXd weightPercentages = atomicToWeightPercent(Q.col(j), elements, _periodicTableInfoDBFile);
+        D(j) = densityOfMixture(weightPercentages, elements, _periodicTableInfoDBFile, EDXSModelConstants::meanType::HARMONIC);
+    }
+
+    return D;
+}
+
 Eigen::MatrixXd EDXSDataset::generateAbsorptionCorrectionMatrix(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H) {
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(_energyAxisSize, H.cols());
 
@@ -529,6 +544,28 @@ Eigen::MatrixXd EDXSDataset::generateAbsorptionCorrectionMatrix(const Eigen::Ref
     }
 
     Eigen::VectorXd thicknessMap = readThicknessMap().array() * 1E-7;
+
+    #pragma omp parallel for
+    for (int j = 0; j < Q.cols(); j++) {
+        double density = 0.0;
+        Eigen::VectorXd absorptionCorrection = computeAbsorptionCorrection(_energyScale, elements, Q.col(j), thicknessMap(j), _elevationAngle, &density, true, _periodicTableInfoDBFile, _massAbsorptionCoefficientsDBFile);
+        A.col(j) = absorptionCorrection;
+    }
+
+    return A;
+}
+
+Eigen::MatrixXd EDXSDataset::generateAbsorptionCorrectionMatrix(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements){
+    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(_energyAxisSize, Q.cols());
+    Eigen::VectorXd thicknessMap = Eigen::VectorXd::Zero(Q.cols());
+
+    if (!_thicknessMapFilePath.empty()) {
+        Eigen::VectorXd thicknessMap = readThicknessMap().array() * 1E-7;
+    }
+
+    else {
+        thicknessMap = Eigen::VectorXd::Constant(Q.cols(), _thickness);
+    }
 
     #pragma omp parallel for
     for (int j = 0; j < Q.cols(); j++) {

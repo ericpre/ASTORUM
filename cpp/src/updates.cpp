@@ -547,25 +547,9 @@ void multiplicativeUpdateW(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eig
         std::cout<<"multiplicativeUpdateW() completed successfully."<<"\n";
 }
 
-void multiplicativeUpdateH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Eigen::MatrixXd>& G, Eigen::Ref<Eigen::MatrixXd> W, bool simplexH, double mu, double epsilonReg, double lambdaL, double logShift, bool safe, bool debug, double dichotomyTol, double sigmaL, bool l2, bool useBregman, const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, const Eigen::Ref<const Eigen::MatrixXd>& fixedH, Eigen::Ref<Eigen::MatrixXd> H) {
+void multiplicativeUpdateH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Eigen::MatrixXd>& G, Eigen::Ref<Eigen::MatrixXd> W, bool simplexH, double mu, double epsilonReg, double lambdaL, double logShift, bool safe, bool debug, double dichotomyTol, double sigmaL, bool l2, bool useBregman, const Eigen::Ref<const Eigen::MatrixXd>& fixedH, Eigen::Ref<Eigen::MatrixXd> H) {
     if (debug)
         std::cout<<"Entered multiplicativeUpdateH()."<<"\n";
-
-    Eigen::MatrixXd HL;
-
-    if (lambdaL != 0.0) {
-        if (debug)
-            std::cout<<"Entered lambdaL != 0.0 case."<<"\n";
-
-        if (L.nonZeros() == 0)
-            throw std::invalid_argument("Updates Error : Laplacian matrix is not provided.");
-
-        else 
-            HL = H * L;
-        
-        if (debug)
-            std::cout<<"lambdaL != 0.0 case done."<<"\n";
-    }
 
     if (safe) {
         if (debug)
@@ -724,7 +708,7 @@ void multiplicativeUpdateH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eig
         }
 
         num.array() += lambdaL * sigmaL * maxH.array();
-        denum.array() += lambdaL * sigmaL * maxH.array() + lambdaL * HL.array();
+        denum.array() += lambdaL * sigmaL * maxH.array() + lambdaL * H.array();
 
         if (debug)
             std::cout<<"lambdaL != 0.0 case done."<<"\n";
@@ -850,13 +834,9 @@ void gradW(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Ei
         std::cout<<"gradW() completed successfully."<<"\n";
 }
 
-void gradH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Eigen::MatrixXd>& G, Eigen::Ref<Eigen::MatrixXd> W, Eigen::Ref<Eigen::MatrixXd> H, double mu, double lambdaL, const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, double epsilonReg, double logShift, bool safe, bool debug, bool l2, Eigen::Ref<Eigen::MatrixXd> grad) {
+void gradH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Eigen::MatrixXd>& G, Eigen::Ref<Eigen::MatrixXd> W, Eigen::Ref<Eigen::MatrixXd> H, double mu, double lambdaL, double epsilonReg, double logShift, bool safe, bool debug, bool l2, Eigen::Ref<Eigen::MatrixXd> grad) {
     if (debug)
         std::cout<<"Entered gradH()."<<"\n";
-
-    if (lambdaL != 0)
-        if (L.nonZeros() == 0)
-            throw std::invalid_argument("Updates Error : Laplacian matrix is not provided.");
 
     if (safe) {
         if (debug)
@@ -913,7 +893,7 @@ void gradH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Ei
         grad.array() += mu / (H.array() + epsilonReg);
 
     if (lambdaL != 0)
-        grad.array() += (lambdaL * (L * H.transpose())).transpose().array();
+        grad.array() += (lambdaL * H).array();
 
     if (debug)
         std::cout<<"gradH() completed successfully."<<"\n";
@@ -1022,7 +1002,7 @@ void projectedGradientStepW(const Eigen::Ref<const Eigen::MatrixXd>& X, const Ei
         std::cout<<"projectedGradientStepW() completed successfully."<<"\n";
 }
 
-void projectedGradientStepH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Eigen::MatrixXd>& G, Eigen::Ref<Eigen::MatrixXd> W, double gamma, bool simplexH, double mu, double logShift, double epsilonReg, bool safe, bool debug, double dichotomyTol, double lambdaL, const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, bool l2, const Eigen::Ref<const Eigen::MatrixXd>& fixedH, Eigen::Ref<Eigen::MatrixXd> H) {
+void projectedGradientStepH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Ref<const Eigen::MatrixXd>& G, Eigen::Ref<Eigen::MatrixXd> W, double gamma, bool simplexH, double mu, double logShift, double epsilonReg, bool safe, bool debug, double dichotomyTol, double lambdaL, bool l2, const Eigen::Ref<const Eigen::MatrixXd>& fixedH, Eigen::Ref<Eigen::MatrixXd> H) {
     if (debug)
         std::cout<<"Entered projectedGradientStepH()."<<"\n";
 
@@ -1038,7 +1018,7 @@ void projectedGradientStepH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Ei
     }
 
     Eigen::MatrixXd grad(H.rows(), H.cols());
-    gradH(X, G, W, H, mu, lambdaL, L, epsilonReg, logShift, safe, debug, l2, grad);
+    gradH(X, G, W, H, mu, lambdaL, epsilonReg, logShift, safe, debug, l2, grad);
 
     if (debug) {
         std::cout<<"grad.rows() = "<<grad.rows()<<"\n";

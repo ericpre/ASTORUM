@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(BlockWiseSmoothNMFlib VERSION 0.1.0 LANGUAGES CXX)
+project(core VERSION 0.2.1 LANGUAGES CXX)
 
 ##### Set default behavior #####
 set(DEFAULT_USE_OMP Yes)
@@ -198,6 +198,8 @@ set(SRC_FILES
     ${CMAKE_SOURCE_DIR}/src/dichotomy.cpp
     ${CMAKE_SOURCE_DIR}/src/EDXSDataset.cpp
     ${CMAKE_SOURCE_DIR}/src/EELSDataset.cpp
+	${CMAKE_SOURCE_DIR}/src/fusionutils.cpp
+	${CMAKE_SOURCE_DIR}/src/HAADFDataset.cpp
     ${CMAKE_SOURCE_DIR}/src/measures.cpp
     ${CMAKE_SOURCE_DIR}/src/modelutils.cpp
     ${CMAKE_SOURCE_DIR}/src/SmoothNMF.cpp
@@ -211,6 +213,8 @@ set(INCLUDE_FILES
     ${CMAKE_SOURCE_DIR}/include/dichotomy.h
     ${CMAKE_SOURCE_DIR}/include/EDXSDataset.h
     ${CMAKE_SOURCE_DIR}/include/EELSDataset.h
+	${CMAKE_SOURCE_DIR}/include/fusionutils.h
+	${CMAKE_SOURCE_DIR}/include/HAADFDataset.h
     ${CMAKE_SOURCE_DIR}/include/measures.h
     ${CMAKE_SOURCE_DIR}/include/modelutils.h
     ${CMAKE_SOURCE_DIR}/include/SmoothNMF.h
@@ -219,17 +223,19 @@ set(INCLUDE_FILES
     )
 
 set(PY_BINDING_FILE
-    ${CMAKE_SOURCE_DIR}/pybind/SmoothNMF_binding.cpp
+    ${CMAKE_SOURCE_DIR}/pybind/binding.cpp
 )
 
-pybind11_add_module(BlockWiseSmoothNMFlib
+pybind11_add_module(core
     ${SRC_FILES}
     ${INCLUDE_FILES}
     ${PY_BINDING_FILE}
 )
 
-target_link_libraries(BlockWiseSmoothNMFlib PUBLIC pybind11::module)
+target_link_libraries(core PUBLIC pybind11::module)
 
-install(TARGETS BlockWiseSmoothNMFlib
+cmake_path(GET CMAKE_SOURCE_DIR PARENT_PATH CMAKE_SOURCE_PARENT)
+
+install(TARGETS core
     COMPONENT python
-    LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}/out")
+    LIBRARY DESTINATION "${CMAKE_SOURCE_PARENT}/astorum")

@@ -10,7 +10,7 @@ double FrobeniusLoss(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eigen::Re
 
 double KLDivLoss(Eigen::Ref<Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> W, Eigen::Ref<Eigen::MatrixXd> H, double logShift, bool average);
 
-double traceXTLX(const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, const Eigen::Ref<const Eigen::MatrixXd>& HT, bool average);
+double traceXTX(const Eigen::Ref<const Eigen::MatrixXd>& HT, bool average);
 
 double logReg(const Eigen::Ref<const Eigen::MatrixXd>& H, double mu, double epsilonReg, bool average);
 

@@ -5,6 +5,7 @@
 #include <pybind11/iostream.h>
 #include "../include/BlockWiseSmoothNMF.h"
 #include "../include/EELSDataset.h"
+#include "../include/HAADFDataset.h"
 
 PYBIND11_MAKE_OPAQUE(std::vector<std::string>);
 PYBIND11_MAKE_OPAQUE(std::vector<double>);
@@ -14,7 +15,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<std::vector<int>>);
 namespace py = pybind11;
 
 
-PYBIND11_MODULE(BlockWiseSmoothNMFlib, m) {
+PYBIND11_MODULE(core, m) {
     py::bind_vector<std::vector<int>>(m, "IntVector");
     py::bind_vector<std::vector<double>>(m, "DoubleVector");
     py::bind_vector<std::vector<std::string>>(m, "StringVector");
@@ -58,7 +59,12 @@ PYBIND11_MODULE(BlockWiseSmoothNMFlib, m) {
         .value("HAMMING", BlockWiseSmoothNMFConstants::distanceMetric::HAMMING)
         .value("JACCARD", BlockWiseSmoothNMFConstants::distanceMetric::JACCARD);
 
-    m.doc() = "A C++ version of the ESPM library for the analysis of EDXS data.";
+    py::enum_<BlockWiseSmoothNMFConstants::fusionType>(m, "BlockWiseSmoothNMFConstants_fusionType")
+        .value("EELS", BlockWiseSmoothNMFConstants::fusionType::EELS)
+        .value("HAADF", BlockWiseSmoothNMFConstants::fusionType::HAADF);
+        
+
+    m.doc() = "The core C++ module for the ASTORUM software package.";
     m.def("countGcolumns", &countGColumns, "Compute the number of columns for the G matrix based on elements and split lines elements.", py::arg("elements"), py::arg("splitLinesElements"));
     m.def("printConcentrationReport", &printConcentrationReport, "Print the concentration report for each phase.", py::arg("G"), py::arg("W"), py::arg("H"), py::arg("modelElements"), py::arg("selectedElements"), py::arg("fitError"),
         py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>());
@@ -105,8 +111,10 @@ PYBIND11_MODULE(BlockWiseSmoothNMFlib, m) {
         .def("readThicknessMap", &EDXSDataset::readThicknessMap, "Read the EELS thickness map from a file.")
         .def("generateQuantificationMatrix", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&>(&EDXSDataset::generateQuantificationMatrix), "Generate a quantification matrix based on the W and H matrices obtained from a previous NMF decomposition.", py::arg("W"), py::arg("H"))
         .def("generateQuantificationMatrix", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&, const std::vector<std::string>&>(&EDXSDataset::generateQuantificationMatrix), "Generate a quantification matrix based on the W and H matrices obtained from a previous NMF decomposition with specified elements used for quantification.", py::arg("W"), py::arg("H"), py::arg("selectedElements"))
-        .def("generateAbsorptionCorrectionMatrix", &EDXSDataset::generateAbsorptionCorrectionMatrix, "Generate an absorption correction matrix based on the W and H matrices obtained from a previous NMF decomposition. The matrix factors are applied to experimental data to correct for the absorption effects.", py::arg("W"), py::arg("H"))
-        .def("computeDensityMap", &EDXSDataset::computeDensityMap, "Compute the density map based on the W and H matrices obtained from a previous NMF decomposition.", py::arg("W"), py::arg("H"))
+        .def("generateAbsorptionCorrectionMatrix", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&>(&EDXSDataset::generateAbsorptionCorrectionMatrix), "Generate an absorption correction matrix based on the W and H matrices obtained from a previous NMF decomposition. The matrix factors are applied to experimental data to correct for the absorption effects.", py::arg("W"), py::arg("H"))
+        .def("generateAbsorptionCorrectionMatrix", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const std::vector<std::string>&>(&EDXSDataset::generateAbsorptionCorrectionMatrix), "Generate an absorption correction matrix based on provided quantification data. The matrix factors are applied to experimental data to correct for the absorption effects.", py::arg("Q"), py::arg("elements"))
+        .def("computeDensityMap", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&>(&EDXSDataset::computeDensityMap), "Compute the density map based on the W and H matrices obtained from a previous NMF decomposition.", py::arg("W"), py::arg("H"))
+        .def("computeDensityMap", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const std::vector<std::string>&>(&EDXSDataset::computeDensityMap), "Compute the density map based on provided quantification data.", py::arg("Q"), py::arg("elements"))
         .def("applyAbsorptionCorrection", &EDXSDataset::applyAbsorptionCorrection, "Apply the absorption correction to experimental data.", py::arg("X"))
         
         .def_readwrite("Gcols", &EDXSDataset::_Gcols)
@@ -249,7 +257,6 @@ PYBIND11_MODULE(BlockWiseSmoothNMFlib, m) {
         .def_readwrite("G", &SmoothNMF::_G)
         .def_readwrite("fixedW", &SmoothNMF::_fixedW)
         .def_readwrite("fixedH", &SmoothNMF::_fixedH)
-        .def_readwrite("L", &SmoothNMF::_L)
         .def_readwrite("channels", &SmoothNMF::_channels)
         .def_readwrite("pixels", &SmoothNMF::_pixels)
         .def_readwrite("components", &SmoothNMF::_components)
@@ -367,4 +374,38 @@ PYBIND11_MODULE(BlockWiseSmoothNMFlib, m) {
         .def_readwrite("componentPresences", &BlockWiseSmoothNMF::_componentPresences)
         .def_readwrite("model", &BlockWiseSmoothNMF::_model)
         .def_readwrite("G", &BlockWiseSmoothNMF::_G);
+
+
+    py::class_<HAADFDataset>(m, "HAADFDataset")
+        .def(py::init<
+            int ,
+            int ,
+            py::EigenDRef<Eigen::VectorXd>
+            >())
+
+        .def("loadEDXSQuantificationData", &HAADFDataset::loadEDXSQuantificationData, "Load EDXS quantification maps for data fusion.", py::arg("QInit"), py::arg("elements"), py::arg("periodicTableInfoFilePath"))
+        .def("runQuantificationDataOptimisationRoutine", &HAADFDataset::runQuantificationDataOptimisationRoutine, "Run the quantification data optimisation routine.", 
+                py::arg("gamma"), py::arg("lambdaHAADF"), py::arg("lambdaChem"), py::arg("lambdaTV"), py::arg("epsilon"), py::arg("nIter"), py::arg("nIterTV"), 
+                py::arg("costHAADF"), py::arg("costChem"), py::arg("costTV"), py::arg("regularise"), py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>())
+        
+        .def_readwrite("xDim", &HAADFDataset::_xDim)
+        .def_readwrite("yDim", &HAADFDataset::_yDim)
+        .def_readwrite("XInit", &HAADFDataset::_XInit)
+        .def_readwrite("X", &HAADFDataset::_X)
+        .def_readwrite("Z", &HAADFDataset::_Z)
+        .def_readwrite("QInit", &HAADFDataset::_QInit)
+        .def_readwrite("Q", &HAADFDataset::_Q)
+        .def_readwrite("periodicTableInfoFilePath", &HAADFDataset::_periodicTableInfoFilePath)
+        .def_readwrite("elements", &HAADFDataset::_elements)
+        .def_readwrite("periodicTableInfoDBFile", &HAADFDataset::_periodicTableInfoDBFile);
+
+    m.def("estimateHAADF", &estimateHAADF, "Estimate the HAADF signal.", py::arg("Q"), py::arg("Z"), py::arg("gamma"));
+    m.def("computeResidualGradient", &computeResidualGradient, "Compute the residual gradient.", py::arg("R"), py::arg("Z"));
+    m.def("forwardModelCost", &forwardModelCost, "Compute the forward model cost.", py::arg("HAADFInit"), py::arg("Q"), py::arg("Z"), py::arg("gamma"));
+    m.def("poissonTermCost", &poissonTermCost, "Compute the Poisson term cost.", py::arg("QInit"), py::arg("Q"), py::arg("epsilon"));
+    m.def("TVObjective2D", &TVObjective2D, "Compute the 2D total variation objective.", py::arg("xDim"), py::arg("yDim"), py::arg("Input"), py::arg("Output"), py::arg("Px"), py::arg("Py"), py::arg("lambdaTV"));
+    m.def("TVGradient2D", &TVGradient2D, "Compute the 2D total variation gradient.", py::arg("xDim"), py::arg("yDim"), py::arg("Input"), py::arg("Px"), py::arg("Py"), py::arg("lFactor"));
+    m.def("TVProject2D", &TVProject2D, "Project the 2D total variation gradient.", py::arg("xDim"), py::arg("yDim"), py::arg("Px"), py::arg("Py"));
+    m.def("TVFastGradientProjection", &TVFastGradientProjection, "Denoise image using the fast gradient projection total variation regularisation algorithm.", py::arg("xDim"), py::arg("yDim"), py::arg("Input"), py::arg("lambdaTV"), py::arg("nIterTV"));
+    m.def("TVRegularisationCost", &TVRegularisationCost, "Compute the total variation regularisation cost.", py::arg("xDim"), py::arg("yDim"), py::arg("Input"));
 }

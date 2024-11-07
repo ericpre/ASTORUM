@@ -39,17 +39,16 @@ double KLDivLoss(Eigen::Ref<Eigen::MatrixXd> X, Eigen::Ref<Eigen::MatrixXd> W, E
     return lossLin - lossLog;
 }
 
-double traceXTLX(const Eigen::Ref<const Eigen::SparseMatrix<double>>& L, const Eigen::Ref<const Eigen::MatrixXd>& HT, bool average) {
-    Eigen::MatrixXd LHT = L * HT;
-    Eigen::MatrixXd HTLHT = LHT.cwiseProduct(HT);
+double traceXTX(const Eigen::Ref<const Eigen::MatrixXd>& HT, bool average) {
+    Eigen::MatrixXd HTsq = HT.cwiseProduct(HT);
 
     double trace = 0.0;
 
     if (average)
-        trace = HTLHT.mean();
+        trace = HTsq.mean();
 
     else
-        trace = HTLHT.sum();
+        trace = HTsq.sum();
 
     return trace;
 }

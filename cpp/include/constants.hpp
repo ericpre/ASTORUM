@@ -54,6 +54,11 @@ namespace BlockWiseSmoothNMFConstants
         HAMMING = 0x206, 
         JACCARD = 0x207
     };
+
+    enum class fusionType : int {
+        EELS = 0x210,
+        HAADF = 0x211
+    };
 }
 
 #endif

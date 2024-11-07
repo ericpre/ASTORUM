@@ -1,8 +1,13 @@
-from BlockWiseSmoothNMFModule.config import *
+import os
+import numpy as np
+import hyperspy.api as hs
+import exspy
+import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.widgets import Button
 from dask.distributed import Client, LocalCluster, get_client
 from scipy.linalg import svd
+from typing import List, Tuple, Optional
 import psutil
 import warnings
 

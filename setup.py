@@ -135,16 +135,16 @@ class CMakeBuild(build_ext):
         return build_args, cmake_args
 
 setup(
-    name = "BlockWiseSmoothNMF",
-    version = "0.1.0",
+    name = "astorum",
+    version = "0.2.1",
     author = "Sebastian Cozma",
     author_email = "sebastian.cozma@epfl.ch",
-    description = "Block-wise implementation of the SmoothNMF algorithm in C++.",
+    description = "Analytical STEM Out-of-core Resource for Unified Multimodal data",
     license = "GPLv3",
     license_files = ("LICENSE"),
     long_description = "",
-    packages = ['BlockWiseSmoothNMFModule'],
-    ext_modules = [CMakeExtension("BlockWiseSmoothNMFlib")],
+    packages = ['astorum'],
+    ext_modules = [CMakeExtension("core")],
     cmdclass = {"build_ext": CMakeBuild},
     zip_safe = False,
     include_package_data = True,

@@ -71,8 +71,6 @@ NMFEstimator::NMFEstimator() {
     _G = Eigen::MatrixXd::Zero(_channels, _Gcols);
     _fixedW = Eigen::MatrixXd::Zero(_Gcols, _components);
     _fixedH = Eigen::MatrixXd::Zero(_components, _pixels);
-    _L = Eigen::SparseMatrix<double>(_pixels, _pixels);
-    _L.setIdentity();
 };
 
 
@@ -114,7 +112,6 @@ NMFEstimator::NMFEstimator(
     _G = Eigen::MatrixXd::Zero(_channels, _Gcols);
     _fixedW = Eigen::MatrixXd::Constant(_Gcols, _components, -1.0);
     _fixedH = Eigen::MatrixXd::Constant(_components, _pixels, -1.0);
-    _L = Eigen::VectorXd::Ones(_pixels).asDiagonal();
 };
 
 
@@ -185,7 +182,6 @@ NMFEstimator::NMFEstimator(
     _G = G;
     _fixedW = fixedW;
     _fixedH = fixedH;
-    _L = Eigen::VectorXd::Ones(_pixels).asDiagonal();
 };
 
 
@@ -255,7 +251,6 @@ NMFEstimator::NMFEstimator(
     _G = Eigen::MatrixXd::Zero(0, 0);
     _fixedW = fixedW;
     _fixedH = fixedH;
-    _L = Eigen::VectorXd::Ones(_pixels).asDiagonal();
 };
 
 
@@ -703,7 +698,7 @@ double SmoothNMF::lossSmoothNMF(Eigen::Ref<Eigen::MatrixXd> W, Eigen::Ref<Eigen:
         reg /= _channels * _pixels;
 
     Eigen::MatrixXd HT = H.transpose();
-    double l2 = 0.5 * _lambdaL * traceXTLX(_L, HT, false);
+    double l2 = 0.5 * _lambdaL * traceXTX(HT, false);
 
     if (average)
         l2 /= _channels * _pixels;
@@ -751,19 +746,19 @@ void SmoothNMF::iteration() {
     else if (_algorithm == SmoothNMFConstants::algorithm::LOG_SURROGATE) {
         if (_debug)
             std::cout<<"Entered LOG_SURROGATE case."<<"\n";
-        multiplicativeUpdateH(_X, _G, _W, _simplexH, _mu, _epsilonReg, _lambdaL, _logShift, _safe, _debug, _dichotomyTol, _sigmaL, _l2, false, _L, _fixedH, _H);
+        multiplicativeUpdateH(_X, _G, _W, _simplexH, _mu, _epsilonReg, _lambdaL, _logShift, _safe, _debug, _dichotomyTol, _sigmaL, _l2, false, _fixedH, _H);
     }
 
     else if (_algorithm == SmoothNMFConstants::algorithm::PROJECTED_GRADIENT) {
         if (_debug)
             std::cout<<"Entered PROJECTED_GRADIENT case."<<"\n";
-        projectedGradientStepH(_X, _G, _W, _gammaStepArray(0), _simplexH, _mu, _logShift, _epsilonReg, _safe, _debug, _dichotomyTol, _lambdaL, _L, _l2, _fixedH, _H);
+        projectedGradientStepH(_X, _G, _W, _gammaStepArray(0), _simplexH, _mu, _logShift, _epsilonReg, _safe, _debug, _dichotomyTol, _lambdaL, _l2, _fixedH, _H);
     }
 
     else if (_algorithm == SmoothNMFConstants::algorithm::BMD) {
         if (_debug)
             std::cout<<"Entered BMD case."<<"\n";
-        multiplicativeUpdateH(_X, _G, _W, _simplexH, _mu, _epsilonReg, _lambdaL, _logShift, _safe, _debug, _dichotomyTol, _sigmaL, _l2, true, _L, _fixedH, _H);
+        multiplicativeUpdateH(_X, _G, _W, _simplexH, _mu, _epsilonReg, _lambdaL, _logShift, _safe, _debug, _dichotomyTol, _sigmaL, _l2, true, _fixedH, _H);
     }
 
     else
@@ -776,7 +771,7 @@ void SmoothNMF::iteration() {
             if (_debug)
                 std::cout<<"Entered LOG_SURROGATE case."<<"\n";
 
-            double d = diffSurrogate(Hold, _H, _L, _sigmaL, _lambdaL, _algorithm);
+            double d = diffSurrogate(Hold, _H, _sigmaL, _lambdaL, _algorithm);
 
             if (_debug)
                 std::cout<<"d = "<<d<<"\n";
@@ -793,7 +788,7 @@ void SmoothNMF::iteration() {
                 std::cout<<"Entered PROJECTED_GRADIENT case."<<"\n";
 
             Eigen::MatrixXd grad;
-            gradH(_X, _G, _W, Hold, _mu, _lambdaL, _L, _epsilonReg, _logShift, _safe, _debug, _l2, grad);
+            gradH(_X, _G, _W, Hold, _mu, _lambdaL, _epsilonReg, _logShift, _safe, _debug, _l2, grad);
 
             double lossOld = lossSmoothNMF(_W, Hold, false);
 

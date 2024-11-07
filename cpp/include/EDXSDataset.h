@@ -1,7 +1,6 @@
 #ifndef EDXSDATASET_H
 #define EDXSDATASET_H
 
-// #include <mpi.h>
 #include "modelutils.h"
 
 class EDXSDataset {
@@ -100,8 +99,12 @@ class EDXSDataset {
         Eigen::MatrixXd generateQuantificationMatrix(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H, const std::vector<std::string>& selectedElements);
 
         Eigen::VectorXd computeDensityMap(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H);
+
+        Eigen::VectorXd computeDensityMap(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements);
         
         Eigen::MatrixXd generateAbsorptionCorrectionMatrix(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H);
+
+        Eigen::MatrixXd generateAbsorptionCorrectionMatrix(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements);
 
         void applyAbsorptionCorrection(Eigen::Ref<Eigen::MatrixXd> X);
 }; 
