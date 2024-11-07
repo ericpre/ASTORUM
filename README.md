@@ -18,7 +18,8 @@ The package is structured as follows:
 - Refining the X-ray absorption model by incorporating HAADF information in the EDXS quantification data, inspired by the work of _J. Manassa et al._:  https://www.elementalmicroscopy.com/articles/EM000003/methods.
 
 ## Installation Prerequisites
-<h3>Windows</h3>
+<h3>Windows Prerequisites</h3>
+On Windows platforms, prior installation of CMake and Visual Studio Build Tools is required.
 
 - CMake: https://cmake.org/cmake/download.
 
