@@ -90,7 +90,7 @@ void dichotomySimplex(const Eigen::Ref<const Eigen::MatrixXd>& A, const Eigen::R
         maxNew = absNew.maxCoeff();
 
         if (iter >= maxIter) {
-            std::cout<<"Dicotomy stopped for maximum number of iterations with an error of"<<" "<<maxNew<<".\n";
+            std::cout<<"Dichotomy stopped for maximum number of iterations with an error of"<<" "<<maxNew<<".\n";
             break;
         }
     }
@@ -165,7 +165,7 @@ void dichotomySimplexProjectedGradient(const Eigen::Ref<const Eigen::MatrixXd>& 
         maxNew = absNew.maxCoeff();
 
         if (iter >= maxIter) {
-            std::cout<<"Dicotomy stopped for maximum number of iterations with an error of"<<" "<<maxNew<<".\n";
+            std::cout<<"Dichotomy stopped for maximum number of iterations with an error of"<<" "<<maxNew<<".\n";
             break;
         }
     }
