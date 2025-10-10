@@ -142,7 +142,7 @@ class PartitionedEDXSDataset:
             for j in range(self.blockstructure[1]):
                 block_data = self.data.blocks[i, j, 0].sum(axis = 2).compute()
 
-                im = axs[i, j].imshow(block_data, cmap = "viridis", interpolation = "nearest", **kwargs)
+                im = axs[i, j].imshow(block_data, interpolation = "nearest", **kwargs)
 
                 axs[i, j].set_xticks([])
                 axs[i, j].set_yticks([])

@@ -1142,7 +1142,7 @@ class BlockWiseSmoothNMF:
         
         nChannels = G.shape[0]
         
-        R = da.zeros((nChannels, int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStrucutre[1])))
+        R = da.zeros((nChannels, int(self.estimator.blockHeight * self.blockStructure[0]), int(self.estimator.blockWidth * self.blockStructure[1])))
         
         for i in range(int(self.blockStructure[0])):
             for j in range(int(self.blockStructure[1])):

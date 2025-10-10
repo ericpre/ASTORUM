@@ -533,7 +533,7 @@ void multiplicativeUpdateW(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eig
         
         W = num.cwiseQuotient(denum).cwiseMax(logShift);
 
-        if ((fixedW.array() != -1.0).all())
+        if ((fixedW.array() != -1.0).any())
             for (int i = 0; i < W.rows(); i++)
                 for (int j = 0; j < W.cols(); j++)
                     if (fixedW(i, j) >= 0.0)
@@ -773,7 +773,7 @@ void multiplicativeUpdateH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Eig
     H.array() = num.array() / (denum.array() + nu.array());
     H = H.cwiseMax(logShift).eval();
 
-    if ((fixedH.array() != -1.0).all())
+    if ((fixedH.array() != -1.0).any())
         for (int i = 0; i < H.rows(); i++)
             for (int j = 0; j < H.cols(); j++)
                 if (fixedH(i, j) >= 0.0)
@@ -988,13 +988,13 @@ void projectedGradientStepW(const Eigen::Ref<const Eigen::MatrixXd>& X, const Ei
         std::cout<<"grad.cols() = "<<grad.cols()<<"\n";
     }
 
-    bool fixedWFlag = fixedW.isZero();
+    bool fixedWFlag = (fixedW.array() != -1.0).any();
 
     for (int i = 0; i < W.rows(); i++)
         for (int j = 0; j < W.cols(); j++) {
             W(i, j) -= 1/gamma * grad(i, j);
 
-            if (!fixedWFlag && fixedW(i, j) >= 0.0)
+            if (fixedWFlag && fixedW(i, j) >= 0.0)
                 W(i, j) = fixedW(i, j);
     }
 
@@ -1049,11 +1049,11 @@ void projectedGradientStepH(const Eigen::Ref<const Eigen::MatrixXd>& X, const Ei
             std::cout<<"simplexH case done."<<"\n";
     }
 
-    bool fixedHFlag = fixedH.isZero();
+    bool fixedHFlag = (fixedH.array() != -1.0).any();
 
     for (int i = 0; i < H.rows(); i++)
         for (int j = 0; j < H.cols(); j++) {
-            if (!fixedHFlag && fixedH(i, j) >= 0.0)
+            if (fixedHFlag && fixedH(i, j) >= 0.0)
                 H(i, j) = fixedH(i, j);
     }
 
