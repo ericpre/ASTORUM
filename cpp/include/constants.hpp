@@ -25,6 +25,14 @@ namespace EDXSModelConstants
     };
 }
 
+namespace EELSModelConstants
+{
+    enum class electronMeanFreePathComputation : int {
+        DENSITY_OF_MIXTURE = 0x90,
+        MEAN_ATOMIC_NUMBER = 0x91
+    };
+}
+
 namespace SmoothNMFConstants 
 {
     enum class algorithm : int {

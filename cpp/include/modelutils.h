@@ -44,6 +44,8 @@ Eigen::VectorXd atomicToWeightPercent(const Eigen::Ref<const Eigen::VectorXd>& a
 
 double densityOfMixture(const Eigen::Ref<const Eigen::VectorXd>& weightPercentages, const std::vector<std::string>& elements, const nlohmann::json& periodicTableInfoFile, EDXSModelConstants::meanType meanType);
 
+double meanAtomicNumber(const Eigen::Ref<const Eigen::VectorXd>& atomicPercentages, const std::vector<std::string>& elements, const nlohmann::json& periodicTableInfoFile);
+
 int energyToArrayIndex(double energy, double energyAxisScale, double energyAxisOffset);
 
 double _basic_simpson(const Eigen::Ref<const Eigen::VectorXd>& y, int start, int stop, const Eigen::Ref<const Eigen::VectorXd>& x, double dx = 1.0);
@@ -56,9 +58,13 @@ double thetaE(double density, double electronEnergy);
 
 double electronInelasticMeanFreePath(double density, double electronEnergy);
 
+double electronInelasticMeanFreePath(double meanAtomicNumber, double electronEnergy, double beta);
+
 double angularCorrection(double density, double electronEnergy, double alpha, double beta);
 
 double estimateThicknessAtPixel(const Eigen::Ref<const Eigen::VectorXd>& EELSLowLossSpectrum, const Eigen::Ref<const Eigen::VectorXd>& energyAxis, double energyAxisScale, double energyAxisOffset, double zeroLossPeakThreshold, double density, double electronEnergy, double alpha, double beta);
+
+double estimateThicknessAtPixel(const Eigen::Ref<const Eigen::VectorXd>& EELSLowLossSpectrum, const Eigen::Ref<const Eigen::VectorXd>& energyAxis, double energyAxisScale, double energyAxisOffset, double zeroLossPeakThreshold, double meanAtomicNumber, double electronEnergy, double beta);
 
 Eigen::VectorXd computeMassAbsorptionCoefficients(const Eigen::Ref<const Eigen::VectorXd>& energyRange, const std::vector<std::string>& elements, const Eigen::Ref<const Eigen::VectorXd>& concentrations, bool atomicFraction, const nlohmann::json& periodicTableInfoFile, const nlohmann::json& massAbsorptionCoefficientFile);
 

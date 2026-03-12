@@ -8,7 +8,8 @@ EELSDataset::EELSDataset() {
     _energyAxisScale = 0.0;
     _energyAxisOffset = 0.0;
     _electronEnergy = 0.0;
-    _densityMap = Eigen::VectorXd::Zero(0);
+    _meanFreePathComputation = EELSModelConstants::electronMeanFreePathComputation::DENSITY_OF_MIXTURE;
+    _densityOrMeanAtomicNumberMap = Eigen::VectorXd::Zero(0);
     _alpha = 0.0;
     _beta = 0.0;
     _zeroLossPeakThreshold = 0.0;
@@ -22,7 +23,8 @@ EELSDataset::EELSDataset(
         double energyAxisScale,
         double energyAxisOffset,
         double electronEnergy,
-        const Eigen::Ref<const Eigen::VectorXd>& densityMap,
+        EELSModelConstants::electronMeanFreePathComputation meanFreePathComputation,
+        const Eigen::Ref<const Eigen::VectorXd>& densityOrMeanAtomicNumberMap,
         double alpha,
         double beta,
         double zeroLossPeakThreshold
@@ -36,7 +38,8 @@ EELSDataset::EELSDataset(
     _energyAxisScale = energyAxisScale;
     _energyAxisOffset = energyAxisOffset;
     _electronEnergy = electronEnergy;
-    _densityMap = densityMap;
+    _meanFreePathComputation = meanFreePathComputation;
+    _densityOrMeanAtomicNumberMap = densityOrMeanAtomicNumberMap;
     _alpha = alpha;
     _beta = beta;
     _zeroLossPeakThreshold = zeroLossPeakThreshold;
@@ -49,8 +52,21 @@ EELSDataset::~EELSDataset() {
 
 
 void EELSDataset::computeThicknessMap() {
-    #pragma omp parallel for
-    for (int i = 0; i < _pixels; i++) {
-        _T(i) = estimateThicknessAtPixel(_X.col(i), _energyAxis, _energyAxisScale, _energyAxisOffset, _zeroLossPeakThreshold, _densityMap(i), _electronEnergy, _alpha, _beta);
+    if (_meanFreePathComputation == EELSModelConstants::electronMeanFreePathComputation::DENSITY_OF_MIXTURE) {
+        #pragma omp parallel for
+        for (int i = 0; i < _pixels; i++) {
+            _T(i) = estimateThicknessAtPixel(_X.col(i), _energyAxis, _energyAxisScale, _energyAxisOffset, _zeroLossPeakThreshold, _densityOrMeanAtomicNumberMap(i), _electronEnergy, _alpha, _beta);
+        }
+    }
+
+    else if (_meanFreePathComputation == EELSModelConstants::electronMeanFreePathComputation::MEAN_ATOMIC_NUMBER) {
+        #pragma omp parallel for
+        for (int i = 0; i < _pixels; i++) {
+            _T(i) = estimateThicknessAtPixel(_X.col(i), _energyAxis, _energyAxisScale, _energyAxisOffset, _zeroLossPeakThreshold, _densityOrMeanAtomicNumberMap(i), _electronEnergy, _beta);
+        }
+    }
+
+    else {
+        throw std::invalid_argument("EELSDataset::computeThicknessMap Error : Invalid mean free path computation method.");
     }
 }

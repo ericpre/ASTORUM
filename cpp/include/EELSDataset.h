@@ -12,7 +12,8 @@ class EELSDataset {
         double _energyAxisScale;
         double _energyAxisOffset;
         double _electronEnergy;
-        Eigen::VectorXd _densityMap;
+        EELSModelConstants::electronMeanFreePathComputation _meanFreePathComputation;
+        Eigen::VectorXd _densityOrMeanAtomicNumberMap;
         double _alpha;
         double _beta;
         double _zeroLossPeakThreshold;
@@ -27,7 +28,8 @@ class EELSDataset {
             double energyAxisScale,
             double energyAxisOffset,
             double electronEnergy,
-            const Eigen::Ref<const Eigen::VectorXd>& densityMap,
+            EELSModelConstants::electronMeanFreePathComputation meanFreePathComputation,
+            const Eigen::Ref<const Eigen::VectorXd>& densityOrMeanAtomicNumberMap,
             double alpha,
             double beta,
             double zeroLossPeakThreshold

@@ -111,6 +111,22 @@ def findOptimalBlockSize(array : np.ndarray, blockSizeFactor : Optional[int] = 1
                     optimalBlock = localBlock
                     
         return optimalBlock
+    
+def normalisePoissonianNoise(array : np.ndarray) -> np.ndarray:
+    if (array < 0).any():
+        raise ValueError("Data contains negative values, cannot normalise Poissonian noise.")
+    
+    G = array.sum(axis = 1)
+    H = array.sum(axis = 0)
+    sqrtG = np.sqrt(G)[:, np.newaxis]
+    sqrtH = np.sqrt(H)[np.newaxis, :]
+    
+    with (np.errstate(divide = 'ignore', invalid = 'ignore')):
+        norm_array = array / (sqrtG * sqrtH)
+        norm_array = np.nan_to_num(norm_array)
+    
+    return norm_array
+
 
 class PartitionedEDXSDataset:
     def __init__(self, dataset : exspy.signals.LazyEDSTEMSpectrum, components : Optional[int] = 30, blocksize : Optional[Tuple[int, int]] = None) -> None:
@@ -195,10 +211,14 @@ class PartitionedEDXSDataset:
         return elbow_position
         
         
-    def blockWiseSVD(self, **kwargs) -> None:
+    def blockWiseSVD(self, normalise_poissonian_noise : Optional[bool] = False, **kwargs) -> None:
         for i in range(self.blockstructure[0]):
             for j in range(self.blockstructure[1]):
                 D_flat = self.data.blocks[i, j, 0].reshape(self.blockshape[0] * self.blockshape[1], self.blockshape[2]).compute()
+                
+                if normalise_poissonian_noise:
+                    D_flat = normalisePoissonianNoise(D_flat)
+                    
                 U, S, V = svd(a = D_flat, **kwargs)
                 U = U[:, :self.components]
                 S = S[:self.components]

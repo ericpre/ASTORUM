@@ -100,7 +100,11 @@ class EDXSDataset {
 
         Eigen::VectorXd computeDensityMap(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H);
 
+        Eigen::VectorXd computeMeanAtomicNumberMap(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H);
+
         Eigen::VectorXd computeDensityMap(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements);
+
+        Eigen::VectorXd computeMeanAtomicNumberMap(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements);
         
         Eigen::MatrixXd generateAbsorptionCorrectionMatrix(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H);
 

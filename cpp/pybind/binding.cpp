@@ -36,6 +36,11 @@ PYBIND11_MODULE(core, m) {
         .value("NONE", EDXSModelConstants::absorptionModelType::NONE);
 
 
+    py::enum_<EELSModelConstants::electronMeanFreePathComputation>(m, "EELSModelConstants_electronMeanFreePathComputation")
+        .value("DENSITY_OF_MIXTURE", EELSModelConstants::electronMeanFreePathComputation::DENSITY_OF_MIXTURE)
+        .value("MEAN_ATOMIC_NUMBER", EELSModelConstants::electronMeanFreePathComputation::MEAN_ATOMIC_NUMBER);
+
+        
     py::enum_<SmoothNMFConstants::algorithm>(m, "SmoothNMFConstants_algorithm")
         .value("LOG_SURROGATE", SmoothNMFConstants::algorithm::LOG_SURROGATE)
         .value("L2_SURROGATE", SmoothNMFConstants::algorithm::L2_SURROGATE)
@@ -70,7 +75,8 @@ PYBIND11_MODULE(core, m) {
         py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>());
     
     m.def("energyToArrayIndex", &energyToArrayIndex, "Convert energy to array index.", py::arg("energy"), py::arg("energyAxisScale"), py::arg("energyAxisOffset"));
-    m.def("estimateThicknessAtPixel", &estimateThicknessAtPixel, "Estimate the thickness at a pixel.", py::arg("EELSLowLossSpectrum"), py::arg("energyAxis"), py::arg("energyAxisScale"), py::arg("energyAxisOffset"), py::arg("zeroLossPeakThreshold"), py::arg("density"), py::arg("electronEnergy"), py::arg("alpha"), py::arg("beta"));
+    m.def("estimateThicknessAtPixel", py::overload_cast<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, double, double, double, double, double, double, double>(&estimateThicknessAtPixel), "Estimate sample thickness at a pixel using the density.", py::arg("EELSLowLossSpectrum"), py::arg("energyAxis"), py::arg("energyAxisScale"), py::arg("energyAxisOffset"), py::arg("zeroLossPeakThreshold"), py::arg("density"), py::arg("electronEnergy"), py::arg("alpha"), py::arg("beta"));
+    m.def("estimateThicknessAtPixel", py::overload_cast<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, double, double, double, double, double, double>(&estimateThicknessAtPixel), "Estimate sample thickness at a pixel using the mean atomic number.", py::arg("EELSLowLossSpectrum"), py::arg("energyAxis"), py::arg("energyAxisScale"), py::arg("energyAxisOffset"), py::arg("zeroLossPeakThreshold"), py::arg("meanAtomicNumber"), py::arg("electronEnergy"), py::arg("beta"));
 
 
     py::class_<EDXSDataset>(m, "EDXSDataset")
@@ -114,7 +120,9 @@ PYBIND11_MODULE(core, m) {
         .def("generateAbsorptionCorrectionMatrix", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&>(&EDXSDataset::generateAbsorptionCorrectionMatrix), "Generate an absorption correction matrix based on the W and H matrices obtained from a previous NMF decomposition. The matrix factors are applied to experimental data to correct for the absorption effects.", py::arg("W"), py::arg("H"))
         .def("generateAbsorptionCorrectionMatrix", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const std::vector<std::string>&>(&EDXSDataset::generateAbsorptionCorrectionMatrix), "Generate an absorption correction matrix based on provided quantification data. The matrix factors are applied to experimental data to correct for the absorption effects.", py::arg("Q"), py::arg("elements"))
         .def("computeDensityMap", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&>(&EDXSDataset::computeDensityMap), "Compute the density map based on the W and H matrices obtained from a previous NMF decomposition.", py::arg("W"), py::arg("H"))
+        .def("computeMeanAtomicNumberMap", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const Eigen::Ref<const Eigen::MatrixXd>&>(&EDXSDataset::computeMeanAtomicNumberMap), "Compute the mean atomic number map based on the W and H matrices obtained from a previous NMF decomposition.", py::arg("W"), py::arg("H"))
         .def("computeDensityMap", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const std::vector<std::string>&>(&EDXSDataset::computeDensityMap), "Compute the density map based on provided quantification data.", py::arg("Q"), py::arg("elements"))
+        .def("computeMeanAtomicNumberMap", py::overload_cast<const Eigen::Ref<const Eigen::MatrixXd>&, const std::vector<std::string>&>(&EDXSDataset::computeMeanAtomicNumberMap), "Compute the mean atomic number map based on provided quantification data.", py::arg("Q"), py::arg("elements"))
         .def("applyAbsorptionCorrection", &EDXSDataset::applyAbsorptionCorrection, "Apply the absorption correction to experimental data.", py::arg("X"))
         
         .def_readwrite("Gcols", &EDXSDataset::_Gcols)
@@ -157,6 +165,7 @@ PYBIND11_MODULE(core, m) {
             double ,
             double ,
             double ,
+            EELSModelConstants::electronMeanFreePathComputation ,
             py::EigenDRef<Eigen::VectorXd> ,
             double ,
             double ,
@@ -171,7 +180,8 @@ PYBIND11_MODULE(core, m) {
         .def_readwrite("energyAxisScale", &EELSDataset::_energyAxisScale)
         .def_readwrite("energyAxisOffset", &EELSDataset::_energyAxisOffset)
         .def_readwrite("electronEnergy", &EELSDataset::_electronEnergy)
-        .def_readwrite("densityMap", &EELSDataset::_densityMap)
+        .def_readwrite("meanFreePathComputation", &EELSDataset::_meanFreePathComputation)
+        .def_readwrite("densityOrMeanAtomicNumberMap", &EELSDataset::_densityOrMeanAtomicNumberMap)
         .def_readwrite("alpha", &EELSDataset::_alpha)
         .def_readwrite("beta", &EELSDataset::_beta)
         .def_readwrite("zeroLossPeakThreshold", &EELSDataset::_zeroLossPeakThreshold)

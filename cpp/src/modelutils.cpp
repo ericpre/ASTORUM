@@ -299,6 +299,26 @@ double densityOfMixture(const Eigen::Ref<const Eigen::VectorXd>& weightPercentag
     return density;
 }
 
+double meanAtomicNumber(const Eigen::Ref<const Eigen::VectorXd>& atomicPercentages, const std::vector<std::string>& elements, const nlohmann::json& periodicTableInfoFile) {
+    Eigen::VectorXd atomicNumbers = Eigen::VectorXd::Zero(atomicPercentages.size());
+
+    for (int i = 0; i < atomicPercentages.size(); i++) {
+        std::string element = elements[i];
+
+        if (periodicTableInfoFile["table"].contains(element)) {
+            atomicNumbers(i) = periodicTableInfoFile["table"][element]["number"];
+        }
+
+        else {
+            throw std::runtime_error("Element " + element + " not found in the periodic table data file.");
+        }
+    }
+
+    double meanAtomicNumber = (atomicPercentages.array() * atomicNumbers.array()).sum() / 100.0;
+
+    return meanAtomicNumber;
+}
+
 int energyToArrayIndex(double energy, double energyAxisScale, double energyAxisOffset) {
     return (int(std::round((energy - energyAxisOffset) / energyAxisScale)));
 }
@@ -392,6 +412,13 @@ double electronInelasticMeanFreePath(double density, double electronEnergy) {
     return (1.0 / invLambda);
 }
 
+double electronInelasticMeanFreePath(double meanAtomicNumber, double electronEnergy, double beta) {
+    double meanEnergyLoss = 7.6 * std::pow(meanAtomicNumber, 0.36);
+    double lambda = (106.0 * F(electronEnergy) * electronEnergy) / (meanEnergyLoss * std::log(2.0 * beta * electronEnergy / meanEnergyLoss));
+
+    return lambda;
+}
+
 double angularCorrection(double density, double electronEnergy, double alpha, double beta) {
     double thetaC = 20.0;
     double A = std::pow(alpha, 2) + std::pow(beta, 2) + 2 * std::pow(thetaE(density, electronEnergy), 2) + std::fabs(std::pow(alpha, 2) - std::pow(beta, 2));
@@ -411,6 +438,17 @@ double estimateThicknessAtPixel(const Eigen::Ref<const Eigen::VectorXd>& EELSLow
     double lambda = electronInelasticMeanFreePath(density, electronEnergy);
 
     return (tOverLambda * lambdaAngularCorrection * lambda);
+}
+
+double estimateThicknessAtPixel(const Eigen::Ref<const Eigen::VectorXd>& EELSLowLossSpectrum, const Eigen::Ref<const Eigen::VectorXd>& energyAxis, double energyAxisScale, double energyAxisOffset, double zeroLossPeakThreshold, double meanAtomicNumber, double electronEnergy, double beta) {
+    double totalIntensity = simpson(EELSLowLossSpectrum, energyAxis);
+    int thresholdIndex = energyToArrayIndex(zeroLossPeakThreshold, energyAxisScale, energyAxisOffset);
+    double zeroLossPeakIntensity = simpson(EELSLowLossSpectrum(Eigen::seq(0, thresholdIndex)), energyAxis(Eigen::seq(0, thresholdIndex)));
+
+    double tOverLambda = std::log(totalIntensity / zeroLossPeakIntensity);
+    double lambda = electronInelasticMeanFreePath(meanAtomicNumber, electronEnergy, beta);
+
+    return (tOverLambda * lambda);
 }
 
 Eigen::VectorXd computeMassAbsorptionCoefficients(const Eigen::Ref<const Eigen::VectorXd>& energyRange, const std::vector<std::string>& elements, const Eigen::Ref<const Eigen::VectorXd>& concentrations, bool atomicFraction, const nlohmann::json& periodicTableInfoFile, const nlohmann::json& massAbsorptionCoefficientFile) {

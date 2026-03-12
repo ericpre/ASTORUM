@@ -136,7 +136,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name = "astorum",
-    version = "0.2.1",
+    version = "0.2.3",
     author = "Sebastian Cozma",
     author_email = "sebastian.cozma@epfl.ch",
     description = "Analytical STEM Out-of-core Resource for Unified Multimodal data",

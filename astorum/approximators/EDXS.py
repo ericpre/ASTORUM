@@ -7,6 +7,7 @@ from typing import List, Tuple, Optional
 import astorum.core as core
 from astorum.config import *
 from astorum.io import *
+from astorum.utilities.PartitionTool import normalisePoissonianNoise as norm_Poisson
 
 class SmoothNMF:
     def __init__(
@@ -40,6 +41,7 @@ class SmoothNMF:
         normalise : Optional[bool] = False,
         noStopCriterion : Optional[bool] = False,
         lineSearch : Optional[bool] = False,
+        normalisePoissonianNoise : Optional[bool] = False,
         beamEnergy : Optional[int] = None,
         problemType : Optional[str] = "BREMSSTRAHLUNG",
         absorptionModelType : Optional[str] = "INTERNAL",
@@ -69,6 +71,10 @@ class SmoothNMF:
     ):
         
         X = np.ascontiguousarray(dataset.data.reshape((dataset.data.shape[0] * dataset.data.shape[1], dataset.data.shape[2])).T, dtype = np.float64)
+        
+        if normalisePoissonianNoise:
+            X = np.ascontiguousarray(norm_Poisson(X.T).T, dtype = np.float64)
+            
         pixels = int(X.shape[1])
         
         if (beamEnergy is None):
@@ -294,6 +300,20 @@ class SmoothNMF:
             D = self.estimator.model.computeDensityMap(W, H)
         
         return D
+ 
+ 
+    def computeMeanAtomicNumberMap(self, Q : np.ndarray = None, elements : List[str] = None) -> np.ndarray:
+        if (Q is not None and elements is not None):
+            Q = np.ascontiguousarray(Q, dtype = np.float64)
+            elements = core.StringVector(elements)
+            meanZ = self.estimator.model.computeMeanAtomicNumberMap(Q, elements)
+            
+        else:
+            W = self.estimator.W
+            H = self.estimator.H
+            meanZ = self.estimator.model.computeMeanAtomicNumberMap(W, H)
+            
+        return meanZ
     
     
     def optimiseQuantificationData(
@@ -342,12 +362,11 @@ class SmoothNMF:
         return (QOptimised, XOptimised, costHAADF, costChem, costTV)
         
     
-    def computeThicknessMap(self, LL : exspy.signals.EELSSpectrum, D : np.ndarray, ZLP_threshold : np.float64, outputFilePath : str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> np.ndarray:
+    def computeThicknessMap(self, LL : exspy.signals.EELSSpectrum, ZLP_threshold : np.float64, outputFilePath : str, D : np.ndarray = None, meanZ : np.ndarray = None, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> np.ndarray:
         X = np.ascontiguousarray(LL.data.reshape((LL.data.shape[0] * LL.data.shape[1], LL.data.shape[2])).T, dtype = np.float64)
         energyAxis = np.ascontiguousarray(LL.axes_manager.signal_axes[0].axis, dtype = np.float64)
         energyAxisScale = np.float64(LL.axes_manager.signal_axes[0].scale)
         energyAxisOffset = np.float64(LL.axes_manager.signal_axes[0].offset)
-        D = np.ascontiguousarray(D, dtype = np.float64)
         beamEnergy = np.float64(LL.metadata.Acquisition_instrument.TEM.beam_energy)
         alpha = np.float64(LL.metadata.Acquisition_instrument.TEM.convergence_angle)
         beta = np.float64(LL.metadata.Acquisition_instrument.TEM.Detector.EELS.collection_angle)
@@ -359,7 +378,24 @@ class SmoothNMF:
             
             os.environ['OMP_NUM_THREADS'] = numThreads
         
-        EELS = core.EELSDataset(X, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, D, alpha, beta, ZLP_threshold)
+        if (D is None and meanZ is None):
+            raise ValueError("Either density map or mean atomic number map must be provided.")
+        
+        if (D is not None and meanZ is not None):
+            raise ValueError("Density map and mean atomic number map cannot be provided simultaneously.")
+        
+        electronMeanFreePathComputation = None
+        lambdaComputationMap = None
+        
+        if (D is not None):
+            lambdaComputationMap = np.ascontiguousarray(D, dtype = np.float64)
+            electronMeanFreePathComputation = core.EELSModelConstants_electronMeanFreePathComputation.DENSITY_OF_MIXTURE
+            
+        elif (meanZ is not None):
+            lambdaComputationMap = np.ascontiguousarray(meanZ, dtype = np.float64)
+            electronMeanFreePathComputation = core.EELSModelConstants_electronMeanFreePathComputation.MEAN_ATOMIC_NUMBER
+        
+        EELS = core.EELSDataset(X, energyAxis, energyAxisScale, energyAxisOffset, beamEnergy, electronMeanFreePathComputation, lambdaComputationMap, alpha, beta, ZLP_threshold)
         EELS.computeThicknessMap()
         
         writeArrayToFile(outputFilePath, EELS.T)
@@ -368,6 +404,9 @@ class SmoothNMF:
         
     
     def computeAbsorptionCorrectionMatrix(self, thicknessMapFilePath : str = None, Q : np.ndarray = None, elements : List[str] = None, outputDirectory : str = None, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> np.ndarray:
+        if (thicknessMapFilePath is None and (Q is None or elements is None)):
+            raise ValueError("Either thickness map or quantification data must be provided.")
+        
         if (thicknessMapFilePath is not None and (Q is not None or elements is not None)):
             raise ValueError("Thickness map and quantification data cannot be provided simultaneously.")
         
@@ -461,6 +500,7 @@ class BlockWiseSmoothNMF:
         blockShape : Tuple[int, int],
         nClusters : int,
         componentsVector : np.ndarray,
+        normalisePoissonianNoise : Optional[bool] = False,
         beamEnergy : Optional[int] = None,
         problemType : Optional[str] = "BREMSSTRAHLUNG",
         absorptionModelType : Optional[str] = "INTERNAL",
@@ -491,6 +531,14 @@ class BlockWiseSmoothNMF:
 
         dataset.rechunk((blockShape[0], blockShape[1], dataset.data.shape[2]))
         X = dataset.data.rechunk((blockShape[0], blockShape[1], dataset.data.shape[2]))
+        
+        if normalisePoissonianNoise:
+            for i in range(dataset.blocks.shape[0]):
+                for j in range(dataset.blocks.shape[1]):
+                    temp_array = dataset.blocks[i, j, 0].compute().reshape(temp_array.shape[0] * temp_array.shape[1], temp_array.shape[2])
+                    temp_array_norm = norm_Poisson(temp_array).reshape(temp_array.shape[0], temp_array.shape[1], temp_array.shape[2])
+                    X.blocks[i, j, 0] = temp_array_norm
+                    
         
         inputDir = os.path.join(workingDirectory, "blockwise_input")
         outputDir = os.path.join(workingDirectory, "blockwise_output")
@@ -887,6 +935,23 @@ class BlockWiseSmoothNMF:
         return D
     
     
+    def computeMeanAtomicNumberMaps(self) -> np.ndarray:
+        meanZ = np.zeros((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
+        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
+        W = np.nan_to_num(W, nan = 1E-14)
+        
+        for i in range(int(self.blockStructure[0])):
+            for j in range(int(self.blockStructure[1])):
+                HFilename = self.estimator.outputDir + "/H/H_block_" + str(i * int(self.blockStructure[1]) + j) + ".onmf"
+                HBlock = readArrayFromFile(HFilename)
+                HBlock = np.nan_to_num(HBlock, nan = 1E-14)
+                meanZBlock = self.estimator.model.computeMeanAtomicNumberMap(W, HBlock).reshape((int(self.estimator.blockHeight), int(self.estimator.blockWidth)))
+                
+                meanZ[i * int(self.estimator.blockHeight) : (i + 1) * int(self.estimator.blockHeight), j * int(self.estimator.blockWidth) : (j + 1) * int(self.estimator.blockWidth)] = meanZBlock
+
+        return meanZ
+    
+    
     def computeDensityMap(self) -> np.ndarray:
         D = np.zeros((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
         W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
@@ -896,6 +961,17 @@ class BlockWiseSmoothNMF:
         D = self.estimator.model.computeDensityMap(W, H).reshape((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
         
         return D
+    
+    
+    def computeMeanAtomicNumberMap(self) -> np.ndarray:
+        meanZ = np.zeros((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
+        W = readArrayFromFile(self.estimator.outputDir + "/W/W_clustered.onmf")
+        W = np.nan_to_num(W, nan = 1E-14)
+        H = readArrayFromFile(self.estimator.outputDir + "/H/H_monolithic.onmf")
+        H = np.nan_to_num(H, nan = 1E-14)
+        meanZ = self.estimator.model.computeMeanAtomicNumberMap(W, H).reshape((int(self.blockStructure[0] * self.estimator.blockHeight), int(self.blockStructure[1] * self.estimator.blockWidth)))
+        
+        return meanZ
     
     
     def optimiseQuantificationMaps(
@@ -1097,7 +1173,7 @@ class BlockWiseSmoothNMF:
             raise ValueError("Invalid fusion type.")
     
     
-    def computeAbsorptionCorrectionMatrix(self, fusionType :str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
+    def computeAbsorptionCorrectionMatrix(self, fusionType : str, useOpenMP : Optional[bool] = True, numThreads : Optional[str] = None) -> None:
         if (useOpenMP):
             if (numThreads is None):
                 numThreads = str(os.cpu_count())

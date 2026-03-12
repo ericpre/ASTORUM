@@ -512,6 +512,29 @@ Eigen::VectorXd EDXSDataset::computeDensityMap(const Eigen::Ref<const Eigen::Mat
     return D;
 }
 
+Eigen::VectorXd EDXSDataset::computeMeanAtomicNumberMap(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H) {
+    Eigen::VectorXd meanZ = Eigen::VectorXd::Zero(H.cols());
+
+    Eigen::MatrixXd Q;
+    std::vector<std::string> elements;
+
+    if (!_absorptionElements.empty()) {
+        elements = _absorptionElements;
+        Q = generateQuantificationMatrix(W, H, elements);
+    }
+
+    else {
+        elements = NMFSimplexElements();
+        Q = generateQuantificationMatrix(W, H);
+    }
+
+    for (int j = 0; j < Q.cols(); j++) {
+        meanZ(j) = meanAtomicNumber(Q.col(j), elements, _periodicTableInfoDBFile);
+    }
+
+    return meanZ;
+}
+
 Eigen::VectorXd EDXSDataset::computeDensityMap(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements) {
     Eigen::VectorXd D = Eigen::VectorXd::Zero(Q.cols());
 
@@ -525,6 +548,20 @@ Eigen::VectorXd EDXSDataset::computeDensityMap(const Eigen::Ref<const Eigen::Mat
     }
 
     return D;
+}
+
+Eigen::VectorXd EDXSDataset::computeMeanAtomicNumberMap(const Eigen::Ref<const Eigen::MatrixXd>& Q, const std::vector<std::string>& elements) {
+    Eigen::VectorXd meanZ = Eigen::VectorXd::Zero(Q.cols());
+
+    if (elements.size() != Q.rows()) {
+        throw std::invalid_argument("EDXS Model Error : Number of elements and rows in quantification data matrix do not match.");
+    }
+
+    for (int j = 0; j < Q.cols(); j++) {
+        meanZ(j) = meanAtomicNumber(Q.col(j), elements, _periodicTableInfoDBFile);
+    }
+
+    return meanZ;
 }
 
 Eigen::MatrixXd EDXSDataset::generateAbsorptionCorrectionMatrix(const Eigen::Ref<const Eigen::MatrixXd>& W, const Eigen::Ref<const Eigen::MatrixXd>& H) {
