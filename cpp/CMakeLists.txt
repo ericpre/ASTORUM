@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-project(core VERSION 0.2.1 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.15)
+project(core VERSION 0.2.3 LANGUAGES CXX)
 
 ##### Set default behavior #####
 set(DEFAULT_USE_OMP Yes)
@@ -234,8 +234,22 @@ pybind11_add_module(core
 
 target_link_libraries(core PUBLIC pybind11::module)
 
-cmake_path(GET CMAKE_SOURCE_DIR PARENT_PATH CMAKE_SOURCE_PARENT)
+if(DEFINED SKBUILD)
+    # scikit-build-core: install into the astorum package directory
+    install(TARGETS core
+        COMPONENT python
+        LIBRARY DESTINATION "${SKBUILD_PLATLIB_DIR}/astorum"
+        RUNTIME DESTINATION "${SKBUILD_PLATLIB_DIR}/astorum")
 
-install(TARGETS core
-    COMPONENT python
-    LIBRARY DESTINATION "${CMAKE_SOURCE_PARENT}/astorum")
+    # Install databases at site-packages/databases/ (read by C++ at runtime)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/../databases/"
+        DESTINATION "${SKBUILD_PLATLIB_DIR}/databases"
+        COMPONENT python)
+else()
+    # Legacy setuptools-based install
+    cmake_path(GET CMAKE_SOURCE_DIR PARENT_PATH CMAKE_SOURCE_PARENT)
+
+    install(TARGETS core
+        COMPONENT python
+        LIBRARY DESTINATION "${CMAKE_SOURCE_PARENT}/astorum")
+endif()
