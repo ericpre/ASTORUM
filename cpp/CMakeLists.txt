@@ -241,9 +241,9 @@ if(DEFINED SKBUILD)
         LIBRARY DESTINATION "${SKBUILD_PLATLIB_DIR}/astorum"
         RUNTIME DESTINATION "${SKBUILD_PLATLIB_DIR}/astorum")
 
-    # Install databases at site-packages/databases/ (read by C++ at runtime)
-    install(DIRECTORY "${CMAKE_SOURCE_DIR}/../databases/"
-        DESTINATION "${SKBUILD_PLATLIB_DIR}/databases"
+    # Install databases at site-packages/astorum/databases/ (read by C++ at runtime)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/../src/astorum/databases/"
+        DESTINATION "${SKBUILD_PLATLIB_DIR}/astorum/databases"
         COMPONENT python)
 else()
     # Legacy setuptools-based install
