@@ -52,3 +52,4 @@ test-command = "python -c \"import astorum; from astorum import core; print('OK'
 select = "*-macosx*"
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", OpenMP_ROOT = "/opt/homebrew/opt/libomp" }
 before-all = "brew install libomp"
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} -L /opt/homebrew/opt/libomp/lib"
