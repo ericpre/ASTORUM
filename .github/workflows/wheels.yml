@@ -43,8 +43,6 @@ jobs:
             arch: aarch64
           - os: macos-latest
             arch: arm64
-          - os: macos-15-intel
-            arch: x86_64
           - os: windows-latest
             arch: AMD64
 
