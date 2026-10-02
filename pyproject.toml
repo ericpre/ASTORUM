@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -29,7 +30,6 @@ dependencies = [
     "hyperspy>=2.0.0",
     "exspy",
     "dask",
-    "jupyterlab",
 ]
 
 [project.optional-dependencies]
@@ -42,13 +42,13 @@ cmake.version = ">=3.15"
 [tool.cibuildwheel]
 build-frontend = "build"
 # Build for CPython 3.11, 3.12, 3.13 (matches python_requires >= 3.11)
-build = "cp311-* cp312-* cp313-*"
+build = "cp311-* cp312-* cp313-* cp314-*"
 # Skip musllinux, 32-bit, and uncommon architectures
-skip = "*-musllinux* *_i686 *_ppc64le *_s390x *_riscv64"
+skip = "*-musllinux* *_i686 *-win32 *_ppc64le *_s390x *_riscv64"
 # Basic import smoke test
-test-command = "python -c 'import astorum; from astorum import core; print(f\"ASTORUM version: {astorum.__version__}\")'"
+test-command = "python -c \"import astorum; from astorum import core; print('OK')\""
 
-# macOS: set deployment target for broad compatibility
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx*"
-environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", LDFLAGS = "-L/opt/homebrew/opt/libomp/lib", CPPFLAGS = "-I/opt/homebrew/opt/libomp/include" }
+before-all = "brew install libomp"
