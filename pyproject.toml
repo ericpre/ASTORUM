@@ -50,5 +50,10 @@ test-command = "python -c \"import astorum; from astorum import core; print('OK'
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx*"
-environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", LDFLAGS = "-L/opt/homebrew/opt/libomp/lib", CPPFLAGS = "-I/opt/homebrew/opt/libomp/include" }
-before-all = "brew install libomp"
+# Build libomp from source with the wheel's deployment target; see
+# tools/build_libomp.sh for why Homebrew is not used. Homebrew bottles target
+# the runner's macOS (currently minos 26.0) and delocate refuses to vendor
+# them into a wheel targeting macOS 11; see
+# https://cibuildwheel.pypa.io/en/stable/faq/#macos-library-dependencies-do-not-satisfy-target-macos
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", OpenMP_ROOT = "/tmp/libomp-install" }
+before-all = "bash tools/build_libomp.sh"

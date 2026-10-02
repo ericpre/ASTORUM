@@ -16,7 +16,18 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 		message(FATAL_ERROR "g++ >= 7.0.0 is required.")
 	endif()
 
-	if("${CMAKE_HOST_SYSTEM_PROCESSOR}" MATCHES "^x86.*")
+	# Distributable wheels must target the architecture baseline, not the
+	# build machine's CPU: -march=native ties the binary to the host. It also
+	# breaks the build on GitHub Actions x86_64 runners (Sapphire Rapids),
+	# where -march=native enables AVX512FP16 and the bundled Eigen 3.4.90
+	# fails to compile (invalid static_cast from Eigen::half to _Float16 in
+	# src/Core/arch/AVX512/PacketMathFP16.h). Wheel builds via scikit-build-core
+	# (SKBUILD defined) therefore use no arch-specific flags. Local development
+	# builds keep the native flags below; pass -DOPT_FLAGS to override.
+	if(DEFINED SKBUILD)
+		set(DEFAULT_OPT_FLAGS "")
+
+	elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" MATCHES "^x86.*")
 		set(DEFAULT_OPT_FLAGS "-mtune=native -march=native -mfpmath=both")
 
 	elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" MATCHES "^arm.*")
@@ -228,6 +239,14 @@ pybind11_add_module(core
 )
 
 target_link_libraries(core PUBLIC pybind11::module)
+
+# OpenMP::OpenMP_CXX only exists when find_package(OpenMP) ran in the
+# GNU/Clang/AppleClang branch above. On MSVC, OpenMP is enabled through the
+# /openmp compile option instead and no imported target is defined, so an
+# unconditional link here would fail CMake generation on Windows.
+if(TARGET OpenMP::OpenMP_CXX)
+    target_link_libraries(core PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 if(DEFINED SKBUILD)
     # scikit-build-core: install into the astorum package directory
