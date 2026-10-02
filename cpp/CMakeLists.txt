@@ -35,9 +35,6 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	endif()
 
 elseif (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
-	set(DEFAULT_USE_OMP No)
-	message(WARNING, "OpenMP is not supported for clang. Do not set USE_OMP=Yes on this environment.")
-
 	if(${COVERAGE})
 		message(FATAL_ERROR "Coverage is not supported for clang. Do not set COVERAGE=Yes on this environment.")
 	endif()
@@ -130,11 +127,9 @@ if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" S
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fext-numeric-literals")
 	endif()
 
-	# Enable OpenMP
-	if(USE_OMP)
- 		find_package(OpenMP QUIET REQUIRED)
-   		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-	endif()
+	# Enable OpenMP (required)
+find_package(OpenMP REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 	# Add optimisation flags
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${OPT_FLAGS}")

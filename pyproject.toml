@@ -30,7 +30,6 @@ dependencies = [
     "hyperspy>=2.0.0",
     "exspy",
     "dask",
-    "jupyterlab",
 ]
 
 [project.optional-dependencies]
@@ -49,7 +48,7 @@ skip = "*-musllinux* *_i686 *-win32 *_ppc64le *_s390x *_riscv64"
 # Basic import smoke test
 test-command = "python -c 'import astorum; from astorum import core; print(f\"ASTORUM version: {astorum.__version__}\")'"
 
-# macOS: set deployment target for broad compatibility
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx*"
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+before-all = "brew install libomp"
