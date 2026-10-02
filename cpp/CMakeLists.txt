@@ -231,7 +231,7 @@ pybind11_add_module(core
     ${PY_BINDING_FILE}
 )
 
-target_link_libraries(core PUBLIC pybind11::module)
+target_link_libraries(core PUBLIC pybind11::module OpenMP::OpenMP_CXX)
 
 if(DEFINED SKBUILD)
     # scikit-build-core: install into the astorum package directory
