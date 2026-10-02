@@ -7,7 +7,7 @@ name = "astorum"
 version = "0.2.3"
 description = "Analytical STEM Out-of-core Resource for Unified Multimodal data"
 readme = "README.md"
-license = "GPLv3"
+license = {text = "GPLv3"}
 license-files = ["LICENSE"]
 authors = [
     { name = "Sebastian Cozma", email = "sebastian.cozma@epfl.ch" },
