@@ -3,6 +3,6 @@ recursive-include cpp/include *.h *.hpp
 recursive-include cpp/pybind *.cpp
 recursive-include cpp/external *
 include cpp/CMakeLists.txt
-recursive-include databases *.json *.txt
+recursive-include src/astorum/databases *.json *.txt
 include LICENSE
 include README.md

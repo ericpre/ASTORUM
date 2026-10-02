@@ -1,9 +1,7 @@
 from pathlib import Path
 
-# Database files live at the project root under databases/.
-# In a wheel install, config.py is at site-packages/astorum/config.py,
-# so parent.parent = site-packages/ and databases/ is installed alongside the package.
-DATABASE_DIR = Path(__file__).parent.parent / "databases"
+# Database files live alongside this module under src/astorum/databases/
+DATABASE_DIR = Path(__file__).parent / "databases"
 
 DETECTOR_EFFICIENCY = DATABASE_DIR / "interpolated_SDD_efficiency.txt"
 PERIODIC_TABLE_INFO = DATABASE_DIR / "periodic_table_symbols.json"
