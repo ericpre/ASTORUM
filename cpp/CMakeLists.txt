@@ -151,9 +151,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 	endif()
 
-elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
-	SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
-
 elseif(MSVC)
 	#Compile csim with cpp compiler since VC does not completely support C99 complex values
 	SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
