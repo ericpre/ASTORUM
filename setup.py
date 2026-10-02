@@ -144,6 +144,7 @@ setup(
     license_files = ("LICENSE"),
     long_description = "",
     packages = ['astorum'],
+    package_dir = {'astorum': 'src/astorum'},
     ext_modules = [CMakeExtension("core")],
     cmdclass = {"build_ext": CMakeBuild},
     zip_safe = False,
