@@ -50,5 +50,5 @@ test-command = "python -c \"import astorum; from astorum import core; print('OK'
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx*"
-environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", OpenMP_ROOT = "/opt/homebrew/opt/libomp", CPPFLAGS = "-I/opt/homebrew/opt/libomp/include" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", OpenMP_ROOT = "/opt/homebrew/opt/libomp" }
 before-all = "brew install libomp"

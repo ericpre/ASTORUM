@@ -130,6 +130,10 @@ if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" S
 	# Enable OpenMP (required)
 find_package(OpenMP REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+if(APPLE)
+  # Homebrew installs libomp as keg-only; FindOpenMP often misses the include dir
+  include_directories(BEFORE SYSTEM /opt/homebrew/opt/libomp/include)
+endif()
 
 	# Add optimisation flags
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${OPT_FLAGS}")
